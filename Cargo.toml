@@ -4,3 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+smithay-client-toolkit = "0.19"
+wayland-client = "0.31"
+cairo-rs = { version = "0.20", features = ["v1_16"] }
+chrono = "0.4"
