@@ -1,4 +1,3 @@
 #!/usr/bin/env bash
 
-cargo build
-WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c ./sway.conf
+cargo build && WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c ./sway.conf
