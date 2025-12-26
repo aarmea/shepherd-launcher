@@ -1,4 +1,5 @@
 use super::clock::ClockApp;
+use crate::daemon::{IpcClient, IpcMessage, IpcResponse};
 use smithay_client_toolkit::{
     compositor::CompositorState,
     output::OutputState,
@@ -49,11 +50,60 @@ pub fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     app.layer_surface = Some(layer_surface);
 
+    // Periodically query daemon status via IPC
+    let mut counter = 0;
+    
+    // Example: Spawn a test process after 2 seconds
+    let mut test_spawned = false;
+    
     loop {
         event_queue.blocking_dispatch(&mut app)?;
         
         if app.configured {
             app.draw(&qh)?;
+            
+            // Example: Spawn a simple graphical process after 2 seconds
+            if counter == 4 && !test_spawned {
+                println!("[UI] Testing process spawn API...");
+                match IpcClient::send_message(&IpcMessage::SpawnProcess {
+                    command: "echo".to_string(),
+                    args: vec!["Hello from spawned process!".to_string()],
+                }) {
+                    Ok(IpcResponse::ProcessSpawned { success, pid, message }) => {
+                        if success {
+                            println!("[UI] Process spawned successfully! PID: {:?}, Message: {}", 
+                                     pid, message);
+                        } else {
+                            println!("[UI] Process spawn failed: {}", message);
+                        }
+                    }
+                    Ok(response) => {
+                        println!("[UI] Unexpected response: {:?}", response);
+                    }
+                    Err(e) => {
+                        eprintln!("[UI] Failed to spawn process: {}", e);
+                    }
+                }
+                test_spawned = true;
+            }
+            
+            // Every 10 iterations (5 seconds), query the daemon
+            if counter % 10 == 0 {
+                match IpcClient::send_message(&IpcMessage::GetStatus) {
+                    Ok(IpcResponse::Status { uptime_secs, apps_running }) => {
+                        println!("[UI] Daemon status - Uptime: {}s, Apps running: {}", 
+                                 uptime_secs, apps_running);
+                    }
+                    Ok(response) => {
+                        println!("[UI] Unexpected daemon response: {:?}", response);
+                    }
+                    Err(e) => {
+                        eprintln!("[UI] Failed to communicate with daemon: {}", e);
+                    }
+                }
+            }
+            counter += 1;
+            
             // Sleep briefly to reduce CPU usage
             std::thread::sleep(std::time::Duration::from_millis(500));
         }
