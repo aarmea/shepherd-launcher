@@ -1,0 +1,17 @@
+[package]
+name = "shepherd-host-api"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Host adapter trait interfaces for shepherdd platform integration"
+
+[dependencies]
+shepherd-util = { workspace = true }
+shepherd-api = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+async-trait = "0.1"
+
+[dev-dependencies]
+serde_json = { workspace = true }

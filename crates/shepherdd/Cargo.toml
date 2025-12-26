@@ -1,0 +1,32 @@
+[package]
+name = "shepherdd"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "The shepherdd daemon: policy enforcement for child-focused computing"
+
+[[bin]]
+name = "shepherdd"
+path = "src/main.rs"
+
+[dependencies]
+shepherd-util = { workspace = true }
+shepherd-api = { workspace = true }
+shepherd-host-api = { workspace = true }
+shepherd-config = { workspace = true }
+shepherd-store = { workspace = true }
+shepherd-core = { workspace = true }
+shepherd-host-linux = { workspace = true }
+shepherd-ipc = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+clap = { version = "4.4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }

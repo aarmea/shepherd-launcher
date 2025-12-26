@@ -1,0 +1,20 @@
+[package]
+name = "shepherd-host-linux"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Linux host adapter for shepherdd: process groups, spawn/kill, exit observation"
+
+[dependencies]
+shepherd-util = { workspace = true }
+shepherd-api = { workspace = true }
+shepherd-host-api = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+nix = { workspace = true }
+async-trait = "0.1"
+
+[dev-dependencies]
+tempfile = { workspace = true }

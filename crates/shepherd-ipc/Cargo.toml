@@ -1,0 +1,19 @@
+[package]
+name = "shepherd-ipc"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "IPC layer for shepherdd: Unix domain socket server, NDJSON protocol"
+
+[dependencies]
+shepherd-util = { workspace = true }
+shepherd-api = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+nix = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

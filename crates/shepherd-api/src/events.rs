@@ -1,0 +1,105 @@
+//! Event types for shepherdd -> client streaming
+
+use chrono::{DateTime, Local};
+use serde::{Deserialize, Serialize};
+use shepherd_util::{EntryId, SessionId};
+use std::time::Duration;
+
+use crate::{DaemonStateSnapshot, SessionEndReason, WarningSeverity, API_VERSION};
+
+/// Event envelope
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Event {
+    pub api_version: u32,
+    pub timestamp: DateTime<Local>,
+    pub payload: EventPayload,
+}
+
+impl Event {
+    pub fn new(payload: EventPayload) -> Self {
+        Self {
+            api_version: API_VERSION,
+            timestamp: Local::now(),
+            payload,
+        }
+    }
+}
+
+/// All possible events from daemon to clients
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum EventPayload {
+    /// Full state snapshot (sent on subscribe and major changes)
+    StateChanged(DaemonStateSnapshot),
+
+    /// Session has started
+    SessionStarted {
+        session_id: SessionId,
+        entry_id: EntryId,
+        label: String,
+        deadline: DateTime<Local>,
+    },
+
+    /// Warning issued for current session
+    WarningIssued {
+        session_id: SessionId,
+        threshold_seconds: u64,
+        time_remaining: Duration,
+        severity: WarningSeverity,
+        message: Option<String>,
+    },
+
+    /// Session is expiring (termination initiated)
+    SessionExpiring {
+        session_id: SessionId,
+    },
+
+    /// Session has ended
+    SessionEnded {
+        session_id: SessionId,
+        entry_id: EntryId,
+        reason: SessionEndReason,
+        duration: Duration,
+    },
+
+    /// Policy was reloaded
+    PolicyReloaded {
+        entry_count: usize,
+    },
+
+    /// Entry availability changed (for UI updates)
+    EntryAvailabilityChanged {
+        entry_id: EntryId,
+        enabled: bool,
+    },
+
+    /// Daemon is shutting down
+    Shutdown,
+
+    /// Audit event (for admin clients)
+    AuditEntry {
+        event_type: String,
+        details: serde_json::Value,
+    },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn event_serialization() {
+        let event = Event::new(EventPayload::SessionStarted {
+            session_id: SessionId::new(),
+            entry_id: EntryId::new("game-1"),
+            label: "Test Game".into(),
+            deadline: Local::now(),
+        });
+
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: Event = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.api_version, API_VERSION);
+        assert!(matches!(parsed.payload, EventPayload::SessionStarted { .. }));
+    }
+}

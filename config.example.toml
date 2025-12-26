@@ -1,0 +1,138 @@
+# Sample shepherdd configuration
+# This file defines the policy for what applications can run and when
+
+config_version = 1
+
+[daemon]
+# Uncomment to customize paths
+# socket_path = "/run/shepherdd/shepherdd.sock"
+# log_dir = "/var/log/shepherdd"
+# data_dir = "/var/lib/shepherdd"
+
+# Default max run duration if not specified per entry (1 hour)
+default_max_run_seconds = 3600
+
+# Default warning thresholds
+[[daemon.default_warnings]]
+seconds_before = 300
+severity = "info"
+message = "5 minutes remaining"
+
+[[daemon.default_warnings]]
+seconds_before = 60
+severity = "warn"
+message = "1 minute remaining!"
+
+[[daemon.default_warnings]]
+seconds_before = 10
+severity = "critical"
+message = "10 seconds remaining!"
+
+# -----------------------------------------------------------------------------
+# Entries
+# -----------------------------------------------------------------------------
+
+# Example: ScummVM - classic adventure games
+[[entries]]
+id = "scummvm"
+label = "ScummVM"
+icon = "scummvm"
+
+[entries.kind]
+type = "process"
+argv = ["scummvm", "-f"]
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+[entries.limits]
+max_run_seconds = 3600  # 1 hour max
+daily_quota_seconds = 7200  # 2 hours per day
+cooldown_seconds = 300  # 5 minute cooldown after each session
+
+# Example: Minecraft (via Prism Launcher)
+[[entries]]
+id = "minecraft"
+label = "Minecraft"
+icon = "prismlauncher"
+
+[entries.kind]
+type = "process"
+argv = ["prismlauncher"]
+
+[entries.availability]
+always = true  # No time restrictions
+
+[entries.limits]
+max_run_seconds = 5400  # 90 minutes
+daily_quota_seconds = 10800  # 3 hours per day
+
+[[entries.warnings]]
+seconds_before = 600
+severity = "info"
+message = "10 minutes left - start wrapping up!"
+
+[[entries.warnings]]
+seconds_before = 120
+severity = "warn"
+message = "2 minutes remaining - save your game!"
+
+[[entries.warnings]]
+seconds_before = 30
+severity = "critical"
+message = "30 seconds! Save NOW!"
+
+# Example: Educational game - unrestricted
+[[entries]]
+id = "tuxmath"
+label = "Tux Math"
+icon = "tuxmath"
+
+[entries.kind]
+type = "process"
+argv = ["tuxmath"]
+
+[entries.availability]
+always = true
+
+[entries.limits]
+max_run_seconds = 7200  # 2 hours
+
+# Example: Web browser (restricted)
+[[entries]]
+id = "browser"
+label = "Web Browser"
+icon = "firefox"
+
+[entries.kind]
+type = "process"
+argv = ["firefox", "-P", "kids"]
+
+[entries.availability]
+[[entries.availability.windows]]
+days = ["sat", "sun"]
+start = "14:00"
+end = "17:00"
+
+[entries.limits]
+max_run_seconds = 1800  # 30 minutes
+daily_quota_seconds = 3600  # 1 hour per day
+
+# Example: Disabled entry
+[[entries]]
+id = "disabled-game"
+label = "Game Under Maintenance"
+disabled = true
+disabled_reason = "This game is being updated"
+
+[entries.kind]
+type = "process"
+argv = ["/bin/false"]
