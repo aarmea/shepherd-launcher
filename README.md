@@ -31,7 +31,8 @@ TODO:
 tl;dr:
 
 1. any Linux with Wayland (optional: TPM-based FDE plus BIOS password to prevent tampering)
-2. System dependencies (Ubuntu: `apt install curl sway swayidle pkg-config libcairo2-dev libxkbcommon-dev`)
+2. System dependencies:
+   - **Ubuntu/Debian**: `apt install build-essential pkg-config libglib2.0-dev libgtk-4-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-xlib-2.0-dev libwayland-dev libx11-dev libxkbcommon-dev libgirepository1.0-dev libgtk4-layer-shell-dev librust-gtk4-layer-shell-sys-dev sway swayidle`
 3. Rust (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
 4. binaries (TODO: deployable package that depends on Sway and installs the config)
 5. test session on login

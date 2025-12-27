@@ -1,7 +1,7 @@
 //! IPC client wrapper for the launcher UI
 
 use anyhow::{Context, Result};
-use shepherd_api::{Command, Event, Response, ResponsePayload, ResponseResult};
+use shepherd_api::{Command, Event, ReasonCode, Response, ResponsePayload, ResponseResult};
 use shepherd_ipc::IpcClient;
 use shepherd_util::EntryId;
 use std::path::Path;
@@ -182,7 +182,7 @@ impl DaemonClient {
                     ResponsePayload::LaunchDenied { reasons } => {
                         let message = reasons
                             .iter()
-                            .map(|r| r.message.as_deref().unwrap_or("Denied"))
+                            .map(|r| reason_to_message(r))
                             .collect::<Vec<_>>()
                             .join(", ");
                         self.state.set(LauncherState::Error { message });
@@ -235,5 +235,17 @@ impl CommandClient {
     pub async fn list_entries(&self) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
         client.send(Command::ListEntries { at_time: None }).await.map_err(Into::into)
+    }
+}
+
+/// Convert a ReasonCode enum variant to a human-readable message
+fn reason_to_message(reason: &ReasonCode) -> &'static str {
+    match reason {
+        ReasonCode::OutsideTimeWindow { .. } => "Outside allowed time window",
+        ReasonCode::QuotaExhausted { .. } => "Daily quota exhausted",
+        ReasonCode::CooldownActive { .. } => "Cooldown period active",
+        ReasonCode::SessionActive { .. } => "Another session is active",
+        ReasonCode::UnsupportedKind { .. } => "Entry type not supported",
+        ReasonCode::Disabled { .. } => "Entry disabled",
     }
 }

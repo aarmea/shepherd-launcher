@@ -20,8 +20,8 @@ use tracing_subscriber::EnvFilter;
 #[command(name = "shepherd-launcher")]
 #[command(about = "GTK4 launcher UI for shepherdd", long_about = None)]
 struct Args {
-    /// Socket path for shepherdd connection
-    #[arg(short, long, default_value = "/run/shepherdd/shepherdd.sock")]
+    /// Socket path for shepherdd connection (or set SHEPHERD_SOCKET env var)
+    #[arg(short, long, env = "SHEPHERD_SOCKET", default_value = "/run/shepherdd/shepherdd.sock")]
     socket: PathBuf,
 
     /// Log level

@@ -6,6 +6,7 @@ use gtk4::subclass::prelude::*;
 use shepherd_api::EntryView;
 use shepherd_util::EntryId;
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::tile::LauncherTile;
 
@@ -15,7 +16,7 @@ mod imp {
     pub struct LauncherGrid {
         pub flow_box: gtk4::FlowBox,
         pub tiles: RefCell<Vec<LauncherTile>>,
-        pub on_launch: RefCell<Option<Box<dyn Fn(EntryId) + 'static>>>,
+        pub on_launch: Rc<RefCell<Option<Box<dyn Fn(EntryId) + 'static>>>>,
     }
 
     impl Default for LauncherGrid {
@@ -23,7 +24,7 @@ mod imp {
             Self {
                 flow_box: gtk4::FlowBox::new(),
                 tiles: RefCell::new(Vec::new()),
-                on_launch: RefCell::new(None),
+                on_launch: Rc::new(RefCell::new(None)),
             }
         }
     }
@@ -120,7 +121,7 @@ impl LauncherGrid {
                 }
             });
 
-            imp.flow_box.append(&tile);
+            imp.flow_box.insert(&tile, -1);
             imp.tiles.borrow_mut().push(tile);
         }
     }

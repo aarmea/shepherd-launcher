@@ -10,7 +10,7 @@ use crate::volume::VolumeStatus;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
-use shepherd_api::commands::Command;
+use shepherd_api::Command;
 use shepherd_ipc::IpcClient;
 use std::cell::RefCell;
 use std::path::PathBuf;

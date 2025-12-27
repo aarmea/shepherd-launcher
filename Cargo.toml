@@ -62,7 +62,7 @@ bitflags = "2.4"
 nix = { version = "0.29", features = ["signal", "process", "user", "socket"] }
 
 # CLI
-clap = { version = "4.5", features = ["derive"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 
 # GTK4 UI
 gtk4 = "0.9"

@@ -38,12 +38,12 @@ struct Args {
     #[arg(short, long, default_value = "/etc/shepherdd/config.toml")]
     config: PathBuf,
 
-    /// Socket path override
-    #[arg(short, long)]
+    /// Socket path override (or set SHEPHERD_SOCKET env var)
+    #[arg(short, long, env = "SHEPHERD_SOCKET")]
     socket: Option<PathBuf>,
 
-    /// Data directory override
-    #[arg(short, long)]
+    /// Data directory override (or set SHEPHERD_DATA_DIR env var)
+    #[arg(short, long, env = "SHEPHERD_DATA_DIR")]
     data_dir: Option<PathBuf>,
 
     /// Log level

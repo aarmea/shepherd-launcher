@@ -105,7 +105,7 @@ impl LauncherApp {
     fn build_ui(app: &gtk4::Application, socket_path: PathBuf) {
         // Load CSS
         let provider = gtk4::CssProvider::new();
-        provider.load_from_string(LAUNCHER_CSS);
+        provider.load_from_data(LAUNCHER_CSS);
         gtk4::style_context_add_provider_for_display(
             &gtk4::gdk::Display::default().expect("Could not get default display"),
             &provider,

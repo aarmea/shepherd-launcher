@@ -3,8 +3,7 @@
 //! The HUD subscribes to events from shepherdd and tracks session state.
 
 use chrono::Local;
-use shepherd_api::events::{Event, EventPayload};
-use shepherd_api::types::SessionEndReason;
+use shepherd_api::{Event, EventPayload, SessionEndReason};
 use shepherd_util::{EntryId, SessionId};
 use std::sync::Arc;
 use tokio::sync::watch;
