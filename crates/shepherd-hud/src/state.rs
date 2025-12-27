@@ -30,7 +30,8 @@ pub enum SessionState {
         session_id: SessionId,
         entry_id: EntryId,
         entry_name: String,
-        time_remaining_secs: u64,
+        warning_issued_at: std::time::Instant,
+        time_remaining_at_warning: u64,
     },
 
     /// Session is ending
@@ -187,7 +188,8 @@ impl SharedState {
                                 session_id: session_id.clone(),
                                 entry_id: entry_id.clone(),
                                 entry_name: entry_name.clone(),
-                                time_remaining_secs: time_remaining.as_secs(),
+                                warning_issued_at: std::time::Instant::now(),
+                                time_remaining_at_warning: time_remaining.as_secs(),
                             };
                         }
                     }

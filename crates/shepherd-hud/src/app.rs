@@ -296,25 +296,35 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
             }
             SessionState::Active {
                 entry_name,
-                time_remaining_secs,
+                started_at,
+                time_limit_secs,
                 paused,
                 ..
             } => {
                 app_label_clone.set_text(entry_name);
-                time_display_clone.set_remaining(*time_remaining_secs);
+                // Calculate remaining time based on elapsed time since session start
+                let remaining = time_limit_secs.map(|limit| {
+                    let elapsed = started_at.elapsed().as_secs();
+                    limit.saturating_sub(elapsed)
+                });
+                time_display_clone.set_remaining(remaining);
                 time_display_clone.set_paused(*paused);
                 warning_box_clone.set_visible(false);
             }
             SessionState::Warning {
                 entry_name,
-                time_remaining_secs,
+                warning_issued_at,
+                time_remaining_at_warning,
                 ..
             } => {
                 app_label_clone.set_text(entry_name);
-                time_display_clone.set_remaining(Some(*time_remaining_secs));
+                // Calculate remaining time based on elapsed time since warning was issued
+                let elapsed = warning_issued_at.elapsed().as_secs();
+                let remaining = time_remaining_at_warning.saturating_sub(elapsed);
+                time_display_clone.set_remaining(Some(remaining));
                 warning_label_clone.set_text(&format!(
                     "Only {} seconds remaining!",
-                    time_remaining_secs
+                    remaining
                 ));
                 warning_box_clone.set_visible(true);
             }
