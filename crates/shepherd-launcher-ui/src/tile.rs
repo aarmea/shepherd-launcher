@@ -82,6 +82,7 @@ impl LauncherTile {
             // Default icon based on entry kind
             let icon_name = match entry.kind_tag {
                 shepherd_api::EntryKindTag::Process => "application-x-executable",
+                shepherd_api::EntryKindTag::Snap => "application-x-executable",
                 shepherd_api::EntryKindTag::Vm => "computer",
                 shepherd_api::EntryKindTag::Media => "video-x-generic",
                 shepherd_api::EntryKindTag::Custom => "applications-other",

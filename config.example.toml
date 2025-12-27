@@ -59,14 +59,16 @@ daily_quota_seconds = 7200  # 2 hours per day
 cooldown_seconds = 300  # 5 minute cooldown after each session
 
 # Example: Minecraft (via snap mc-installer)
+# Uses the special "snap" entry type for proper process management
 [[entries]]
 id = "minecraft"
 label = "Minecraft"
 icon = "minecraft"
 
 [entries.kind]
-type = "process"
-argv = ["mc-installer"]
+type = "snap"
+snap_name = "mc-installer"
+# command = "mc-installer"  # Optional: defaults to snap_name
 
 [entries.availability]
 always = true  # No time restrictions

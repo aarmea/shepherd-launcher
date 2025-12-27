@@ -113,8 +113,17 @@ impl HostAdapter for LinuxHost {
         entry_kind: &EntryKind,
         options: SpawnOptions,
     ) -> HostResult<HostSessionHandle> {
-        let (argv, env, cwd) = match entry_kind {
-            EntryKind::Process { argv, env, cwd } => (argv.clone(), env.clone(), cwd.clone()),
+        // Extract argv, env, cwd, and snap_name based on entry kind
+        let (argv, env, cwd, snap_name) = match entry_kind {
+            EntryKind::Process { argv, env, cwd } => {
+                (argv.clone(), env.clone(), cwd.clone(), None)
+            }
+            EntryKind::Snap { snap_name, command, env } => {
+                // For snap apps, the command defaults to the snap name
+                let cmd = command.clone().unwrap_or_else(|| snap_name.clone());
+                let argv = vec![cmd];
+                (argv, env.clone(), None, Some(snap_name.clone()))
+            }
             EntryKind::Vm { driver, args } => {
                 // Construct command line from VM driver
                 let mut argv = vec![driver.clone()];
@@ -126,15 +135,15 @@ impl HostAdapter for LinuxHost {
                         argv.push(value.to_string());
                     }
                 }
-                (argv, HashMap::new(), None)
+                (argv, HashMap::new(), None, None)
             }
-            EntryKind::Media { library_id, args } => {
+            EntryKind::Media { library_id, args: _ } => {
                 // For media, we'd typically launch a media player
                 // This is a placeholder - real implementation would integrate with a player
-                let mut argv = vec!["xdg-open".to_string(), library_id.clone()];
-                (argv, HashMap::new(), None)
+                let argv = vec!["xdg-open".to_string(), library_id.clone()];
+                (argv, HashMap::new(), None, None)
             }
-            EntryKind::Custom { type_name, payload } => {
+            EntryKind::Custom { type_name: _, payload: _ } => {
                 return Err(HostError::UnsupportedKind);
             }
         };
@@ -147,11 +156,11 @@ impl HostAdapter for LinuxHost {
             &env,
             cwd.as_ref(),
             options.capture_stdout || options.capture_stderr,
+            snap_name.clone(),
         )?;
 
         let pid = proc.pid;
         let pgid = proc.pgid;
-        let snap_name = proc.snap_name.clone();
         
         // Store the session info so we can use it for killing even after process exits
         let session_info_entry = SessionInfo {

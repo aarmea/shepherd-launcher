@@ -58,6 +58,7 @@ impl HostCapabilities {
     pub fn linux_full() -> Self {
         let mut spawn_kinds = HashSet::new();
         spawn_kinds.insert(EntryKindTag::Process);
+        spawn_kinds.insert(EntryKindTag::Snap);
         spawn_kinds.insert(EntryKindTag::Vm);
         spawn_kinds.insert(EntryKindTag::Media);
 

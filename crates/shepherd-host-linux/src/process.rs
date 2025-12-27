@@ -9,32 +9,6 @@ use tracing::{debug, info, warn};
 
 use shepherd_host_api::{ExitStatus, HostError, HostResult};
 
-/// Extract the snap name from a command path
-/// Examples:
-/// - "/snap/mc-installer/279/bin/mc-installer" -> Some("mc-installer")
-/// - "mc-installer" (if it's a snap) -> Some("mc-installer")  
-/// - "/usr/bin/firefox" -> None
-fn extract_snap_name(program: &str) -> Option<String> {
-    // Check if it's a path starting with /snap/
-    if program.starts_with("/snap/") {
-        // Format: /snap/<snap-name>/<revision>/...
-        let parts: Vec<&str> = program.split('/').collect();
-        if parts.len() >= 3 {
-            return Some(parts[2].to_string());
-        }
-    }
-    
-    // Check if it looks like a snap command (no path, and we can verify via snap path)
-    if !program.contains('/') {
-        let snap_path = format!("/snap/bin/{}", program);
-        if std::path::Path::new(&snap_path).exists() {
-            return Some(program.to_string());
-        }
-    }
-    
-    None
-}
-
 /// Managed child process with process group tracking
 pub struct ManagedProcess {
     pub child: Child,
@@ -149,11 +123,15 @@ pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
 
 impl ManagedProcess {
     /// Spawn a new process in its own process group
+    /// 
+    /// If `snap_name` is provided, the process is treated as a snap app and will use
+    /// systemd scope-based killing instead of signal-based killing.
     pub fn spawn(
         argv: &[String],
         env: &HashMap<String, String>,
         cwd: Option<&std::path::PathBuf>,
         capture_output: bool,
+        snap_name: Option<String>,
     ) -> HostResult<Self> {
         if argv.is_empty() {
             return Err(HostError::SpawnFailed("Empty argv".into()));
@@ -293,10 +271,6 @@ impl ManagedProcess {
 
         let pid = child.id();
         let pgid = pid; // After setsid, pid == pgid
-
-        // Extract snap name from command if it's a snap app
-        // Format: /snap/<snap-name>/... or just the snap command name
-        let snap_name = extract_snap_name(program);
         
         info!(pid = pid, pgid = pgid, program = %program, snap = ?snap_name, "Process spawned");
 
@@ -484,7 +458,7 @@ mod tests {
         let argv = vec!["true".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
 
         // Wait for it to complete
         let status = proc.wait().unwrap();
@@ -496,7 +470,7 @@ mod tests {
         let argv = vec!["echo".to_string(), "hello".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
         let status = proc.wait().unwrap();
         assert!(status.is_success());
     }
@@ -506,7 +480,7 @@ mod tests {
         let argv = vec!["sleep".to_string(), "60".to_string()];
         let env = HashMap::new();
 
-        let proc = ManagedProcess::spawn(&argv, &env, None, false).unwrap();
+        let proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
 
         // Give it a moment to start
         std::thread::sleep(std::time::Duration::from_millis(50));

@@ -192,6 +192,7 @@ pub struct LimitsPolicy {
 fn convert_entry_kind(raw: RawEntryKind) -> EntryKind {
     match raw {
         RawEntryKind::Process { argv, env, cwd } => EntryKind::Process { argv, env, cwd },
+        RawEntryKind::Snap { snap_name, command, env } => EntryKind::Snap { snap_name, command, env },
         RawEntryKind::Vm { driver, args } => EntryKind::Vm { driver, args },
         RawEntryKind::Media { library_id, args } => EntryKind::Media { library_id, args },
         RawEntryKind::Custom { type_name, payload } => EntryKind::Custom {

@@ -12,6 +12,7 @@ use std::time::Duration;
 #[serde(rename_all = "snake_case")]
 pub enum EntryKindTag {
     Process,
+    Snap,
     Vm,
     Media,
     Custom,
@@ -26,6 +27,17 @@ pub enum EntryKind {
         #[serde(default)]
         env: HashMap<String, String>,
         cwd: Option<PathBuf>,
+    },
+    /// Snap application - uses systemd scope-based process management
+    Snap {
+        /// The snap name (e.g., "mc-installer")
+        snap_name: String,
+        /// Command to run (defaults to snap_name if not specified)
+        #[serde(default)]
+        command: Option<String>,
+        /// Additional environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
     },
     Vm {
         driver: String,
@@ -47,6 +59,7 @@ impl EntryKind {
     pub fn tag(&self) -> EntryKindTag {
         match self {
             EntryKind::Process { .. } => EntryKindTag::Process,
+            EntryKind::Snap { .. } => EntryKindTag::Snap,
             EntryKind::Vm { .. } => EntryKindTag::Vm,
             EntryKind::Media { .. } => EntryKindTag::Media,
             EntryKind::Custom { .. } => EntryKindTag::Custom,

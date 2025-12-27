@@ -83,6 +83,16 @@ pub enum RawEntryKind {
         env: HashMap<String, String>,
         cwd: Option<PathBuf>,
     },
+    /// Snap application - uses systemd scope-based process management
+    Snap {
+        /// The snap name (e.g., "mc-installer")
+        snap_name: String,
+        /// Command to run (defaults to snap_name if not specified)
+        command: Option<String>,
+        /// Additional environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
     Vm {
         driver: String,
         #[serde(default)]
