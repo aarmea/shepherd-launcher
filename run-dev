@@ -13,6 +13,9 @@ mkdir -p "$DATA_DIR"
 export SHEPHERD_SOCKET="$SOCKET_PATH"
 export SHEPHERD_DATA_DIR="$DATA_DIR"
 
+# Note: Since shepherdd now runs inside sway, spawned apps automatically
+# use the nested compositor's display. No SHEPHERD_WAYLAND_DISPLAY override needed.
+
 # Build all binaries
 echo "Building shepherd binaries..."
 cargo build
@@ -20,28 +23,21 @@ cargo build
 # Function to cleanup background processes on exit
 cleanup() {
     echo "Cleaning up..."
-    if [ ! -z "$SHEPHERDD_PID" ]; then
-        kill $SHEPHERDD_PID 2>/dev/null || true
-    fi
-    if [ ! -z "$HUD_PID" ]; then
-        kill $HUD_PID 2>/dev/null || true
+    # Kill the nested sway - this will clean up everything inside it (including shepherdd)
+    if [ ! -z "$SWAY_PID" ]; then
+        kill $SWAY_PID 2>/dev/null || true
     fi
 }
 trap cleanup EXIT
 
-# Start the background daemon
-echo "Starting shepherdd..."
-./target/debug/shepherdd -c ./config.example.toml &
-SHEPHERDD_PID=$!
+# Note: shepherdd is started by sway.conf so it runs INSIDE the nested compositor.
+# This ensures all spawned processes (games, apps) use the nested compositor's display.
 
-# Give the daemon a moment to initialize
-sleep 1
+# Start sway with the launcher and HUD
+# The HUD and launcher are started by sway.conf so they run INSIDE the nested compositor
+echo "Starting nested sway with shepherd-launcher..."
+WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c ./sway.conf &
+SWAY_PID=$!
 
-# Start the HUD in the background
-echo "Starting shepherd-hud..."
-./target/debug/shepherd-hud &
-HUD_PID=$!
-
-# Start sway with the launcher
-echo "Starting sway with shepherd-launcher..."
-WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c ./sway.conf
+# Wait for sway to exit
+wait $SWAY_PID
