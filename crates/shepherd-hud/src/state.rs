@@ -41,12 +41,12 @@ pub enum SessionState {
 }
 
 impl SessionState {
-    /// Check if there's an active or warning session
+    /// Check if the HUD should be visible
+    /// The HUD is always visible - it shows session info when active,
+    /// or a minimal bar when no session
     pub fn is_visible(&self) -> bool {
-        matches!(
-            self,
-            SessionState::Active { .. } | SessionState::Warning { .. } | SessionState::Ending { .. }
-        )
+        // Always show the HUD
+        true
     }
 
     /// Get the current session ID if any
