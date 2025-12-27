@@ -249,7 +249,27 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         let session_state = state_for_close.session_state();
         if let Some(session_id) = session_state.session_id() {
             tracing::info!("Requesting end session for {}", session_id);
-            // This would need to send EndSession command to daemon
+            // Send StopCurrent command to daemon
+            let socket_path = std::env::var("SHEPHERD_SOCKET")
+                .unwrap_or_else(|_| "./dev-runtime/shepherd.sock".to_string());
+            std::thread::spawn(move || {
+                let rt = Runtime::new().expect("Failed to create runtime");
+                rt.block_on(async {
+                    match IpcClient::connect(std::path::PathBuf::from(&socket_path)).await {
+                        Ok(mut client) => {
+                            let cmd = Command::StopCurrent {
+                                mode: shepherd_api::StopMode::Graceful,
+                            };
+                            if let Err(e) = client.send(cmd).await {
+                                tracing::error!("Failed to send StopCurrent: {}", e);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::error!("Failed to connect to daemon: {}", e);
+                        }
+                    }
+                });
+            });
         }
     });
     right_box.append(&close_button);

@@ -13,7 +13,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
 
-use crate::ManagedProcess;
+use crate::process::{init_cgroup_base, ManagedProcess};
 
 /// Linux host adapter
 pub struct LinuxHost {
@@ -21,17 +21,23 @@ pub struct LinuxHost {
     processes: Arc<Mutex<HashMap<u32, ManagedProcess>>>,
     event_tx: mpsc::UnboundedSender<HostEvent>,
     event_rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<HostEvent>>>>,
+    /// Whether cgroups are available for process management
+    cgroups_enabled: bool,
 }
 
 impl LinuxHost {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
+        
+        // Try to initialize cgroups
+        let cgroups_enabled = init_cgroup_base();
 
         Self {
             capabilities: HostCapabilities::linux_full(),
             processes: Arc::new(Mutex::new(HashMap::new())),
             event_tx: tx,
             event_rx: Arc::new(Mutex::new(Some(rx))),
+            cgroups_enabled,
         }
     }
 
@@ -126,11 +132,19 @@ impl HostAdapter for LinuxHost {
             }
         };
 
-        let proc = ManagedProcess::spawn(
+        // Use cgroups for process management if available
+        let session_id_str = if self.cgroups_enabled {
+            Some(session_id.to_string())
+        } else {
+            None
+        };
+        
+        let proc = ManagedProcess::spawn_with_session_id(
             &argv,
             &env,
             cwd.as_ref(),
             options.capture_stdout || options.capture_stderr,
+            session_id_str.as_deref(),
         )?;
 
         let pid = proc.pid;
