@@ -75,22 +75,18 @@ impl DaemonClient {
 
         info!("Connected to daemon");
 
-        // Get initial state
+        // Get initial state (includes entries)
+        info!("Sending GetState command");
         let response = client.send(Command::GetState).await?;
+        info!("Got GetState response");
         self.handle_response(response)?;
 
-        // Subscribe to events
-        let response = client.send(Command::SubscribeEvents).await?;
-        if let ResponseResult::Err(e) = response.result {
-            warn!(error = %e.message, "Failed to subscribe to events");
-        }
+        // Note: ListEntries is not needed since GetState includes entries in the snapshot
 
-        // Get entries list
-        let response = client.send(Command::ListEntries { at_time: None }).await?;
-        self.handle_response(response)?;
-
-        // Now consume client for event stream
+        // Now consume client for event stream (this will send SubscribeEvents internally)
+        info!("Subscribing to events");
         let mut events = client.subscribe().await?;
+        info!("Subscribed to events, entering event loop");
 
         // Main event loop
         loop {
@@ -124,7 +120,7 @@ impl DaemonClient {
                 event_result = events.next() => {
                     match event_result {
                         Ok(event) => {
-                            debug!(event = ?event, "Received event");
+                            info!(event = ?event, "Received event from daemon (client.rs)");
                             self.state.handle_event(event);
                         }
                         Err(e) => {

@@ -308,16 +308,18 @@ impl Daemon {
                 let now_mono = MonotonicInstant::now();
                 let now = Local::now();
 
-                debug!(
+                info!(
                     session_id = %handle.session_id,
                     status = ?status,
-                    "Host process exited"
+                    "Host process exited - will end session"
                 );
 
                 let core_event = {
                     let mut engine = engine.lock().await;
                     engine.notify_session_exited(status.code, now_mono, now)
                 };
+
+                info!(has_event = core_event.is_some(), "notify_session_exited result");
 
                 if let Some(event) = core_event {
                     if let CoreEvent::SessionEnded {
@@ -327,6 +329,13 @@ impl Daemon {
                         duration,
                     } = event
                     {
+                        info!(
+                            session_id = %session_id,
+                            entry_id = %entry_id,
+                            reason = ?reason,
+                            duration_secs = duration.as_secs(),
+                            "Broadcasting SessionEnded"
+                        );
                         ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
                             session_id,
                             entry_id,
@@ -339,6 +348,7 @@ impl Daemon {
                             let engine = engine.lock().await;
                             engine.get_state()
                         };
+                        info!("Broadcasting StateChanged");
                         ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
                     }
                 }
@@ -501,9 +511,28 @@ impl Daemon {
                                     }
                                 }
                                 Err(e) => {
-                                    // Notify session ended with error
+                                    // Notify session ended with error and broadcast to subscribers
                                     let mut eng = engine.lock().await;
-                                    eng.notify_session_exited(Some(-1), now_mono, now);
+                                    if let Some(event) = eng.notify_session_exited(Some(-1), now_mono, now) {
+                                        if let CoreEvent::SessionEnded {
+                                            session_id,
+                                            entry_id,
+                                            reason,
+                                            duration,
+                                        } = event
+                                        {
+                                            ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
+                                                session_id,
+                                                entry_id,
+                                                reason,
+                                                duration,
+                                            }));
+
+                                            // Broadcast state change so clients return to idle
+                                            let state = eng.get_state();
+                                            ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
+                                        }
+                                    }
 
                                     Response::error(
                                         request_id,

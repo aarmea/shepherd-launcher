@@ -173,7 +173,74 @@ impl LauncherApp {
                 match client.launch(&entry_id).await {
                     Ok(response) => {
                         debug!(response = ?response, "Launch response");
-                        // State will be updated via events
+                        // Handle error responses from daemon
+                        match response.result {
+                            shepherd_api::ResponseResult::Ok(payload) => {
+                                // Check what kind of success response we got
+                                match payload {
+                                    shepherd_api::ResponsePayload::LaunchApproved { session_id, deadline } => {
+                                        info!(session_id = %session_id, "Launch approved, setting SessionActive");
+                                        let now = chrono::Local::now();
+                                        let time_remaining = if deadline > now {
+                                            (deadline - now).to_std().ok()
+                                        } else {
+                                            Some(std::time::Duration::ZERO)
+                                        };
+                                        state.set(LauncherState::SessionActive {
+                                            session_id,
+                                            entry_label: entry_id.to_string(),
+                                            time_remaining,
+                                        });
+                                    }
+                                    shepherd_api::ResponsePayload::LaunchDenied { reasons } => {
+                                        let message = reasons
+                                            .iter()
+                                            .map(|r| format!("{:?}", r))
+                                            .collect::<Vec<_>>()
+                                            .join(", ");
+                                        error!(message = %message, "Launch denied");
+                                        state.set(LauncherState::Error { message });
+                                    }
+                                    _ => {
+                                        // Other OK responses - events will update state
+                                    }
+                                }
+                            }
+                            shepherd_api::ResponseResult::Err(err) => {
+                                // Launch failed on server side - refresh state to recover
+                                error!(error = %err.message, "Launch failed on server");
+                                // Request fresh state from daemon to get back to correct state
+                                match client.get_state().await {
+                                    Ok(state_resp) => {
+                                        if let shepherd_api::ResponseResult::Ok(
+                                            shepherd_api::ResponsePayload::State(snapshot)
+                                        ) = state_resp.result {
+                                            if snapshot.current_session.is_some() {
+                                                // Session is still active somehow
+                                                debug!("Session still active after spawn failure");
+                                            } else {
+                                                // No session - return to idle with entries
+                                                state.set(LauncherState::Idle {
+                                                    entries: snapshot.entries,
+                                                });
+                                            }
+                                        } else {
+                                            // Unexpected response, show error
+                                            state.set(LauncherState::Error {
+                                                message: format!("Launch failed: {}", err.message),
+                                            });
+                                        }
+                                    }
+                                    Err(e) => {
+                                        // Can't get state, show error
+                                        error!(error = %e, "Failed to get state after launch failure");
+                                        state.set(LauncherState::Error {
+                                            message: format!("Launch failed: {}", err.message),
+                                        });
+                                    }
+                                }
+                            }
+                        }
                     }
                     Err(e) => {
                         error!(error = %e, "Launch failed");
@@ -208,12 +275,16 @@ impl LauncherApp {
             });
         });
 
-        // Start daemon client in background
+        // Start daemon client in background thread (separate from GTK main loop)
+        // This ensures the tokio runtime is properly driven for event reception
         let state_for_client = state.clone();
         let socket_for_client = socket_path.clone();
-        runtime.spawn(async move {
-            let client = DaemonClient::new(socket_for_client, state_for_client, command_rx);
-            client.run().await;
+        std::thread::spawn(move || {
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime for event loop");
+            rt.block_on(async move {
+                let client = DaemonClient::new(socket_for_client, state_for_client, command_rx);
+                client.run().await;
+            });
         });
 
         // Set up state change handler

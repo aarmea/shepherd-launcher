@@ -60,8 +60,10 @@ impl SharedState {
 
     /// Update state from daemon event
     pub fn handle_event(&self, event: Event) {
+        tracing::info!(event = ?event.payload, "Received event from daemon");
         match event.payload {
             EventPayload::StateChanged(snapshot) => {
+                tracing::info!(has_session = snapshot.current_session.is_some(), "Applying state snapshot");
                 self.apply_snapshot(snapshot);
             }
             EventPayload::SessionStarted {
@@ -70,6 +72,7 @@ impl SharedState {
                 label,
                 deadline,
             } => {
+                tracing::info!(session_id = %session_id, label = %label, "Session started event");
                 let now = chrono::Local::now();
                 let time_remaining = if deadline > now {
                     (deadline - now).to_std().ok()
@@ -82,7 +85,8 @@ impl SharedState {
                     time_remaining,
                 });
             }
-            EventPayload::SessionEnded { .. } => {
+            EventPayload::SessionEnded { session_id, entry_id, reason, .. } => {
+                tracing::info!(session_id = %session_id, entry_id = %entry_id, reason = ?reason, "Session ended event - setting Connecting");
                 // Will be followed by StateChanged, but set to connecting
                 // to ensure grid reloads
                 self.set(LauncherState::Connecting);

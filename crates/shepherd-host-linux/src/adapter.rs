@@ -66,7 +66,7 @@ impl LinuxHost {
                 }
 
                 for (pid, pgid, status) in exited {
-                    debug!(pid = pid, status = ?status, "Process exited");
+                    info!(pid = pid, pgid = pgid, status = ?status, "Process exited - sending HostEvent::Exited");
 
                     // We don't have the session_id here, so we use a placeholder
                     // The daemon should track the mapping
