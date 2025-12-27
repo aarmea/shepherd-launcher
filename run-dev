@@ -9,6 +9,16 @@ SOCKET_PATH="$DEV_RUNTIME/shepherd.sock"
 
 mkdir -p "$DATA_DIR"
 
+# Kill any existing shepherd dev instances before starting
+echo "Cleaning up any existing dev instances..."
+pkill -f "sway -c ./sway.conf" 2>/dev/null || true
+pkill -f "shepherdd" 2>/dev/null || true
+pkill -f "shepherd-launcher" 2>/dev/null || true
+pkill -f "shepherd-hud" 2>/dev/null || true
+# Remove stale socket
+rm -f "$SOCKET_PATH"
+sleep 0.5
+
 # Export environment variables for shepherd binaries
 export SHEPHERD_SOCKET="$SOCKET_PATH"
 export SHEPHERD_DATA_DIR="$DATA_DIR"
@@ -27,6 +37,12 @@ cleanup() {
     if [ ! -z "$SWAY_PID" ]; then
         kill $SWAY_PID 2>/dev/null || true
     fi
+    # Also explicitly kill any shepherd processes that might have escaped
+    pkill -f "shepherdd" 2>/dev/null || true
+    pkill -f "shepherd-launcher" 2>/dev/null || true
+    pkill -f "shepherd-hud" 2>/dev/null || true
+    # Remove socket
+    rm -f "$SOCKET_PATH"
 }
 trap cleanup EXIT
 

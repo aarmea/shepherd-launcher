@@ -58,15 +58,15 @@ max_run_seconds = 3600  # 1 hour max
 daily_quota_seconds = 7200  # 2 hours per day
 cooldown_seconds = 300  # 5 minute cooldown after each session
 
-# Example: Minecraft (via Prism Launcher)
+# Example: Minecraft (via snap mc-installer)
 [[entries]]
 id = "minecraft"
 label = "Minecraft"
-icon = "prismlauncher"
+icon = "minecraft"
 
 [entries.kind]
 type = "process"
-argv = ["prismlauncher"]
+argv = ["mc-installer"]
 
 [entries.availability]
 always = true  # No time restrictions
@@ -105,26 +105,6 @@ always = true
 
 [entries.limits]
 max_run_seconds = 7200  # 2 hours
-
-# Example: Web browser (restricted)
-[[entries]]
-id = "browser"
-label = "Web Browser"
-icon = "firefox"
-
-[entries.kind]
-type = "process"
-argv = ["firefox", "-P", "kids"]
-
-[entries.availability]
-[[entries.availability.windows]]
-days = ["sat", "sun"]
-start = "14:00"
-end = "17:00"
-
-[entries.limits]
-max_run_seconds = 1800  # 30 minutes
-daily_quota_seconds = 3600  # 1 hour per day
 
 # Example: Disabled entry
 [[entries]]

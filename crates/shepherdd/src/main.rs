@@ -569,8 +569,25 @@ impl Daemon {
                     StopMode::Force => SessionEndReason::AdminStop,
                 };
 
-                match eng.stop_current(reason, now_mono, now) {
-                    StopDecision::Stopped(_result) => {
+                match eng.stop_current(reason.clone(), now_mono, now) {
+                    StopDecision::Stopped(result) => {
+                        // Broadcast SessionEnded event so UIs know to transition
+                        info!(
+                            session_id = %result.session_id,
+                            reason = ?result.reason,
+                            "Broadcasting SessionEnded from StopCurrent"
+                        );
+                        ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
+                            session_id: result.session_id,
+                            entry_id: result.entry_id,
+                            reason: result.reason,
+                            duration: result.duration,
+                        }));
+
+                        // Also broadcast StateChanged so UIs can update their entry list
+                        let snapshot = eng.get_state();
+                        ipc.broadcast_event(Event::new(EventPayload::StateChanged(snapshot)));
+
                         drop(eng); // Release lock before host operations
 
                         // Stop the actual process

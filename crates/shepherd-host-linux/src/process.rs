@@ -1,146 +1,159 @@
 //! Process management utilities
 
 use nix::sys::signal::{self, Signal};
-use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
 use nix::unistd::Pid;
 use std::collections::HashMap;
 use std::os::unix::process::CommandExt;
-use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use tracing::{debug, info, warn};
 
 use shepherd_host_api::{ExitStatus, HostError, HostResult};
 
-/// Base path for shepherd's cgroups
-const CGROUP_BASE: &str = "/sys/fs/cgroup/shepherd";
+/// Extract the snap name from a command path
+/// Examples:
+/// - "/snap/mc-installer/279/bin/mc-installer" -> Some("mc-installer")
+/// - "mc-installer" (if it's a snap) -> Some("mc-installer")  
+/// - "/usr/bin/firefox" -> None
+fn extract_snap_name(program: &str) -> Option<String> {
+    // Check if it's a path starting with /snap/
+    if program.starts_with("/snap/") {
+        // Format: /snap/<snap-name>/<revision>/...
+        let parts: Vec<&str> = program.split('/').collect();
+        if parts.len() >= 3 {
+            return Some(parts[2].to_string());
+        }
+    }
+    
+    // Check if it looks like a snap command (no path, and we can verify via snap path)
+    if !program.contains('/') {
+        let snap_path = format!("/snap/bin/{}", program);
+        if std::path::Path::new(&snap_path).exists() {
+            return Some(program.to_string());
+        }
+    }
+    
+    None
+}
 
-/// Managed child process with process group and optional cgroup
+/// Managed child process with process group tracking
 pub struct ManagedProcess {
     pub child: Child,
     pub pid: u32,
     pub pgid: u32,
-    /// The cgroup path if cgroups are enabled
-    pub cgroup_path: Option<PathBuf>,
+    /// The command name (for fallback killing via pkill)
+    pub command_name: String,
+    /// The snap name if this is a snap app (for cgroup-based killing)
+    pub snap_name: Option<String>,
 }
 
-/// Initialize the shepherd cgroup hierarchy (called once at startup)
-pub fn init_cgroup_base() -> bool {
-    let base = Path::new(CGROUP_BASE);
+/// Initialize process management (called once at startup)
+pub fn init() {
+    info!("Process management initialized");
+}
+
+/// Kill all processes in a snap's cgroup using systemd
+/// Snaps create scopes at: snap.<snap-name>.<snap-name>-<uuid>.scope
+/// Direct signals don't work due to AppArmor confinement, but systemctl --user does
+/// NOTE: We always use SIGKILL for snap apps because apps like Minecraft Launcher
+/// have self-restart behavior and will spawn new instances when receiving SIGTERM
+pub fn kill_snap_cgroup(snap_name: &str, _signal: Signal) -> bool {
+    let uid = nix::unistd::getuid().as_raw();
+    let base_path = format!(
+        "/sys/fs/cgroup/user.slice/user-{}.slice/user@{}.service/app.slice",
+        uid, uid
+    );
     
-    // Check if cgroups v2 is available
-    if !Path::new("/sys/fs/cgroup/cgroup.controllers").exists() {
-        info!("cgroups v2 not available, falling back to process group signals");
+    // Find all scope directories matching this snap
+    let pattern = format!("snap.{}.{}-", snap_name, snap_name);
+    
+    let base = std::path::Path::new(&base_path);
+    if !base.exists() {
+        debug!(path = %base_path, "Snap cgroup base path doesn't exist");
         return false;
     }
     
-    // Try to create our base cgroup
-    if !base.exists() {
-        if let Err(e) = std::fs::create_dir_all(base) {
-            warn!(error = %e, "Failed to create shepherd cgroup base - running without cgroup support");
-            return false;
+    let mut stopped_any = false;
+    
+    if let Ok(entries) = std::fs::read_dir(base) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            
+            if name_str.starts_with(&pattern) && name_str.ends_with(".scope") {
+                let scope_name = name_str.to_string();
+                
+                // Always use SIGKILL for snap apps to prevent self-restart behavior
+                // Using systemctl kill --signal=KILL sends SIGKILL to all processes in scope
+                let result = Command::new("systemctl")
+                    .args(["--user", "kill", "--signal=KILL", &scope_name])
+                    .output();
+                
+                match result {
+                    Ok(output) => {
+                        if output.status.success() {
+                            info!(scope = %scope_name, "Killed snap scope via systemctl SIGKILL");
+                            stopped_any = true;
+                        } else {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            warn!(scope = %scope_name, stderr = %stderr, "systemctl kill command failed");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(scope = %scope_name, error = %e, "Failed to run systemctl");
+                    }
+                }
+            }
         }
     }
     
-    info!("cgroups v2 initialized at {}", CGROUP_BASE);
-    true
-}
-
-/// Create a cgroup for a session
-fn create_session_cgroup(session_id: &str) -> Option<PathBuf> {
-    let cgroup_path = PathBuf::from(CGROUP_BASE).join(session_id);
-    
-    if let Err(e) = std::fs::create_dir_all(&cgroup_path) {
-        warn!(error = %e, path = %cgroup_path.display(), "Failed to create session cgroup");
-        return None;
+    if stopped_any {
+        info!(snap = snap_name, "Killed snap scope(s) via systemctl SIGKILL");
+    } else {
+        debug!(snap = snap_name, "No snap scope found to kill");
     }
     
-    debug!(path = %cgroup_path.display(), "Created session cgroup");
-    Some(cgroup_path)
+    stopped_any
 }
 
-/// Move a process into a cgroup
-fn move_to_cgroup(cgroup_path: &Path, pid: u32) -> bool {
-    let procs_file = cgroup_path.join("cgroup.procs");
+/// Kill processes by command name using pkill
+pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
+    let signal_name = match signal {
+        Signal::SIGTERM => "TERM",
+        Signal::SIGKILL => "KILL",
+        _ => "TERM",
+    };
     
-    if let Err(e) = std::fs::write(&procs_file, pid.to_string()) {
-        warn!(error = %e, pid = pid, path = %procs_file.display(), "Failed to move process to cgroup");
-        return false;
-    }
+    // Use pkill to find and kill processes by command name
+    let result = Command::new("pkill")
+        .args([&format!("-{}", signal_name), "-f", command_name])
+        .output();
     
-    debug!(pid = pid, cgroup = %cgroup_path.display(), "Moved process to cgroup");
-    true
-}
-
-/// Get all PIDs in a cgroup
-fn get_cgroup_pids(cgroup_path: &Path) -> Vec<i32> {
-    let procs_file = cgroup_path.join("cgroup.procs");
-    
-    match std::fs::read_to_string(&procs_file) {
-        Ok(contents) => {
-            contents
-                .lines()
-                .filter_map(|line| line.trim().parse::<i32>().ok())
-                .collect()
+    match result {
+        Ok(output) => {
+            // pkill returns 0 if processes were found and signaled
+            if output.status.success() {
+                info!(command = command_name, signal = signal_name, "Killed processes by command name");
+                true
+            } else {
+                // No processes found is not an error
+                debug!(command = command_name, "No processes found matching command name");
+                false
+            }
         }
         Err(e) => {
-            debug!(error = %e, path = %procs_file.display(), "Failed to read cgroup.procs");
-            Vec::new()
+            warn!(command = command_name, error = %e, "Failed to run pkill");
+            false
         }
     }
-}
-
-/// Kill all processes in a cgroup
-fn kill_cgroup(cgroup_path: &Path, signal: Signal) -> Vec<i32> {
-    let pids = get_cgroup_pids(cgroup_path);
-    
-    for pid in &pids {
-        let _ = signal::kill(Pid::from_raw(*pid), signal);
-    }
-    
-    if !pids.is_empty() {
-        debug!(pids = ?pids, signal = ?signal, cgroup = %cgroup_path.display(), "Sent signal to cgroup processes");
-    }
-    
-    pids
-}
-
-/// Remove a session cgroup (must be empty)
-fn cleanup_session_cgroup(cgroup_path: &Path) {
-    // The cgroup must be empty before we can remove it
-    // We'll try a few times in case processes are still exiting
-    for _ in 0..5 {
-        let pids = get_cgroup_pids(cgroup_path);
-        if pids.is_empty() {
-            if let Err(e) = std::fs::remove_dir(cgroup_path) {
-                debug!(error = %e, path = %cgroup_path.display(), "Failed to remove session cgroup");
-            } else {
-                debug!(path = %cgroup_path.display(), "Removed session cgroup");
-            }
-            return;
-        }
-        std::thread::sleep(std::time::Duration::from_millis(100));
-    }
-    debug!(path = %cgroup_path.display(), "Cgroup still has processes, leaving cleanup for later");
 }
 
 impl ManagedProcess {
-    /// Spawn a new process in its own process group and optionally in a cgroup
+    /// Spawn a new process in its own process group
     pub fn spawn(
         argv: &[String],
         env: &HashMap<String, String>,
-        cwd: Option<&PathBuf>,
+        cwd: Option<&std::path::PathBuf>,
         capture_output: bool,
-    ) -> HostResult<Self> {
-        Self::spawn_with_session_id(argv, env, cwd, capture_output, None)
-    }
-    
-    /// Spawn a new process with an optional session ID for cgroup management
-    pub fn spawn_with_session_id(
-        argv: &[String],
-        env: &HashMap<String, String>,
-        cwd: Option<&PathBuf>,
-        capture_output: bool,
-        session_id: Option<&str>,
     ) -> HostResult<Self> {
         if argv.is_empty() {
             return Err(HostError::SpawnFailed("Empty argv".into()));
@@ -260,12 +273,13 @@ impl ManagedProcess {
 
         cmd.stdin(Stdio::null());
 
+        // Store the command name for later use in killing
+        let command_name = program.to_string();
+
         // Set up process group - this child becomes its own process group leader
         // SAFETY: This is safe in the pre-exec context
         unsafe {
             cmd.pre_exec(|| {
-                // Create new session (which creates new process group)
-                // This ensures the child is the leader of a new process group
                 nix::unistd::setsid().map_err(|e| {
                     std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
                 })?;
@@ -279,28 +293,14 @@ impl ManagedProcess {
 
         let pid = child.id();
         let pgid = pid; // After setsid, pid == pgid
+
+        // Extract snap name from command if it's a snap app
+        // Format: /snap/<snap-name>/... or just the snap command name
+        let snap_name = extract_snap_name(program);
         
-        // Try to create a cgroup for this session and move the process into it
-        let cgroup_path = if let Some(sid) = session_id {
-            if let Some(cg_path) = create_session_cgroup(sid) {
-                if move_to_cgroup(&cg_path, pid) {
-                    info!(pid = pid, cgroup = %cg_path.display(), "Process moved to session cgroup");
-                    Some(cg_path)
-                } else {
-                    // Cleanup the empty cgroup we created
-                    let _ = std::fs::remove_dir(&cg_path);
-                    None
-                }
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        info!(pid = pid, pgid = pgid, program = %program, snap = ?snap_name, "Process spawned");
 
-        debug!(pid = pid, pgid = pgid, program = %program, has_cgroup = cgroup_path.is_some(), "Process spawned");
-
-        Ok(Self { child, pid, pgid, cgroup_path })
+        Ok(Self { child, pid, pgid, command_name, snap_name })
     }
 
     /// Get all descendant PIDs of this process using /proc
@@ -343,16 +343,12 @@ impl ManagedProcess {
         descendants
     }
 
-    /// Send SIGTERM to all processes in this session (via cgroup if available, or process group)
+    /// Send SIGTERM to all processes in this session
     pub fn terminate(&self) -> HostResult<()> {
-        // If we have a cgroup, use it - this is the most reliable method
-        if let Some(ref cgroup_path) = self.cgroup_path {
-            let pids = kill_cgroup(cgroup_path, Signal::SIGTERM);
-            info!(pids = ?pids, cgroup = %cgroup_path.display(), "Sent SIGTERM via cgroup");
-            return Ok(());
-        }
+        // First try to kill by command name - this catches snap apps and re-parented processes
+        kill_by_command(&self.command_name, Signal::SIGTERM);
         
-        // Fallback: try to kill the process group
+        // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32)); // Negative for process group
 
         match signal::kill(pgid, Signal::SIGTERM) {
@@ -379,16 +375,12 @@ impl ManagedProcess {
         Ok(())
     }
 
-    /// Send SIGKILL to all processes in this session (via cgroup if available, or process group)
+    /// Send SIGKILL to all processes in this session
     pub fn kill(&self) -> HostResult<()> {
-        // If we have a cgroup, use it - this is the most reliable method
-        if let Some(ref cgroup_path) = self.cgroup_path {
-            let pids = kill_cgroup(cgroup_path, Signal::SIGKILL);
-            info!(pids = ?pids, cgroup = %cgroup_path.display(), "Sent SIGKILL via cgroup");
-            return Ok(());
-        }
+        // First try to kill by command name - this catches snap apps and re-parented processes
+        kill_by_command(&self.command_name, Signal::SIGKILL);
         
-        // Fallback: try to kill the process group
+        // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32));
 
         match signal::kill(pgid, Signal::SIGKILL) {
@@ -471,21 +463,15 @@ impl ManagedProcess {
         }
     }
     
-    /// Clean up resources associated with this process (especially cgroups)
+    /// Clean up resources associated with this process
     pub fn cleanup(&self) {
-        if let Some(ref cgroup_path) = self.cgroup_path {
-            cleanup_session_cgroup(cgroup_path);
-        }
+        // Nothing to clean up for systemd scopes - systemd handles it
     }
 }
 
 impl Drop for ManagedProcess {
     fn drop(&mut self) {
-        // Try to clean up the cgroup when the process struct is dropped
-        if let Some(ref cgroup_path) = self.cgroup_path {
-            // Only try once, don't block in Drop
-            let _ = std::fs::remove_dir(cgroup_path);
-        }
+        // Nothing special to do for systemd scopes - systemd cleans up automatically
     }
 }
 

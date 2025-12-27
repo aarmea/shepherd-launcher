@@ -1,9 +1,9 @@
 //! Linux host adapter implementation
 
 use async_trait::async_trait;
-use shepherd_api::{EntryKind, EntryKindTag};
+use shepherd_api::EntryKind;
 use shepherd_host_api::{
-    ExitStatus, HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload,
+    HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload,
     HostResult, HostSessionHandle, SpawnOptions, StopMode,
 };
 use shepherd_util::SessionId;
@@ -11,33 +11,40 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info, warn};
+use tracing::{info, warn};
 
-use crate::process::{init_cgroup_base, ManagedProcess};
+use crate::process::{init, kill_by_command, kill_snap_cgroup, ManagedProcess};
+
+/// Information tracked for each session for cleanup purposes
+#[derive(Clone, Debug)]
+struct SessionInfo {
+    command_name: String,
+    snap_name: Option<String>,
+}
 
 /// Linux host adapter
 pub struct LinuxHost {
     capabilities: HostCapabilities,
     processes: Arc<Mutex<HashMap<u32, ManagedProcess>>>,
+    /// Track session info for killing
+    session_info: Arc<Mutex<HashMap<SessionId, SessionInfo>>>,
     event_tx: mpsc::UnboundedSender<HostEvent>,
     event_rx: Arc<Mutex<Option<mpsc::UnboundedReceiver<HostEvent>>>>,
-    /// Whether cgroups are available for process management
-    cgroups_enabled: bool,
 }
 
 impl LinuxHost {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
         
-        // Try to initialize cgroups
-        let cgroups_enabled = init_cgroup_base();
+        // Initialize process management
+        init();
 
         Self {
             capabilities: HostCapabilities::linux_full(),
             processes: Arc::new(Mutex::new(HashMap::new())),
+            session_info: Arc::new(Mutex::new(HashMap::new())),
             event_tx: tx,
             event_rx: Arc::new(Mutex::new(Some(rx))),
-            cgroups_enabled,
         }
     }
 
@@ -132,23 +139,27 @@ impl HostAdapter for LinuxHost {
             }
         };
 
-        // Use cgroups for process management if available
-        let session_id_str = if self.cgroups_enabled {
-            Some(session_id.to_string())
-        } else {
-            None
-        };
+        // Get the command name for fallback killing
+        let command_name = argv.first().cloned().unwrap_or_default();
         
-        let proc = ManagedProcess::spawn_with_session_id(
+        let proc = ManagedProcess::spawn(
             &argv,
             &env,
             cwd.as_ref(),
             options.capture_stdout || options.capture_stderr,
-            session_id_str.as_deref(),
         )?;
 
         let pid = proc.pid;
         let pgid = proc.pgid;
+        let snap_name = proc.snap_name.clone();
+        
+        // Store the session info so we can use it for killing even after process exits
+        let session_info_entry = SessionInfo {
+            command_name: command_name.clone(),
+            snap_name: snap_name.clone(),
+        };
+        self.session_info.lock().unwrap().insert(session_id.clone(), session_info_entry);
+        info!(session_id = %session_id, command = %command_name, snap = ?snap_name, "Tracking session info");
 
         let handle = HostSessionHandle::new(
             session_id,
@@ -163,26 +174,42 @@ impl HostAdapter for LinuxHost {
     }
 
     async fn stop(&self, handle: &HostSessionHandle, mode: StopMode) -> HostResult<()> {
+        let session_id = handle.session_id.clone();
         let (pid, _pgid) = match handle.payload() {
             HostHandlePayload::Linux { pid, pgid } => (*pid, *pgid),
             _ => return Err(HostError::SessionNotFound),
         };
 
-        // Check if process exists
-        {
-            let procs = self.processes.lock().unwrap();
-            if !procs.contains_key(&pid) {
-                return Err(HostError::SessionNotFound);
-            }
+        // Get the session's info for killing
+        let session_info = self.session_info.lock().unwrap().get(&session_id).cloned();
+        
+        // Check if we have session info OR a tracked process
+        let has_process = self.processes.lock().unwrap().contains_key(&pid);
+        
+        if session_info.is_none() && !has_process {
+            warn!(session_id = %session_id, pid = pid, "No session info or tracked process found");
+            return Err(HostError::SessionNotFound);
         }
 
         match mode {
             StopMode::Graceful { timeout } => {
-                // Send SIGTERM
+                // If this is a snap app, use cgroup-based killing (most reliable)
+                if let Some(ref info) = session_info {
+                    if let Some(ref snap) = info.snap_name {
+                        kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGTERM);
+                        info!(snap = %snap, "Sent SIGTERM via snap cgroup");
+                    } else {
+                        // Fall back to command name for non-snap apps
+                        kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGTERM);
+                        info!(command = %info.command_name, "Sent SIGTERM via command name");
+                    }
+                }
+                
+                // Also send SIGTERM via process handle
                 {
                     let procs = self.processes.lock().unwrap();
                     if let Some(p) = procs.get(&pid) {
-                        p.terminate()?;
+                        let _ = p.terminate();
                     }
                 }
 
@@ -190,31 +217,57 @@ impl HostAdapter for LinuxHost {
                 let start = std::time::Instant::now();
                 loop {
                     if start.elapsed() >= timeout {
-                        // Force kill after timeout
+                        // Force kill after timeout using snap cgroup or command name
+                        if let Some(ref info) = session_info {
+                            if let Some(ref snap) = info.snap_name {
+                                kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
+                                info!(snap = %snap, "Sent SIGKILL via snap cgroup (timeout)");
+                            } else {
+                                kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGKILL);
+                                info!(command = %info.command_name, "Sent SIGKILL via command name (timeout)");
+                            }
+                        }
+                        
+                        // Also force kill via process handle
                         let procs = self.processes.lock().unwrap();
                         if let Some(p) = procs.get(&pid) {
-                            p.kill()?;
+                            let _ = p.kill();
                         }
                         break;
                     }
 
-                    {
-                        let procs = self.processes.lock().unwrap();
-                        if !procs.contains_key(&pid) {
-                            break;
-                        }
+                    // Check if process is still running
+                    let still_running = self.processes.lock().unwrap().contains_key(&pid);
+                    
+                    if !still_running {
+                        break;
                     }
 
                     tokio::time::sleep(Duration::from_millis(50)).await;
                 }
             }
             StopMode::Force => {
+                // Force kill via snap cgroup or command name
+                if let Some(ref info) = session_info {
+                    if let Some(ref snap) = info.snap_name {
+                        kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
+                        info!(snap = %snap, "Sent SIGKILL via snap cgroup");
+                    } else {
+                        kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGKILL);
+                        info!(command = %info.command_name, "Sent SIGKILL via command name");
+                    }
+                }
+                
+                // Also force kill via process handle
                 let procs = self.processes.lock().unwrap();
                 if let Some(p) = procs.get(&pid) {
-                    p.kill()?;
+                    let _ = p.kill();
                 }
             }
         }
+        
+        // Clean up the session info tracking
+        self.session_info.lock().unwrap().remove(&session_id);
 
         Ok(())
     }
