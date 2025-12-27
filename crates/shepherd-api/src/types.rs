@@ -169,6 +169,9 @@ pub struct DaemonStateSnapshot {
     pub policy_loaded: bool,
     pub current_session: Option<SessionInfo>,
     pub entry_count: usize,
+    /// Available entries for UI display
+    #[serde(default)]
+    pub entries: Vec<EntryView>,
 }
 
 /// Role for authorization

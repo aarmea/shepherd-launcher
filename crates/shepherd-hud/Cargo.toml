@@ -1,0 +1,29 @@
+[package]
+name = "shepherd-hud"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "GTK4 HUD overlay for shepherdd - always-visible status bar"
+
+[[bin]]
+name = "shepherd-hud"
+path = "src/main.rs"
+
+[dependencies]
+shepherd-api = { workspace = true }
+shepherd-ipc = { workspace = true }
+shepherd-util = { workspace = true }
+
+gtk4 = { workspace = true }
+gtk4-layer-shell = { workspace = true }
+clap = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+
+[features]
+default = []

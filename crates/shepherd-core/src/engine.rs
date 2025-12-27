@@ -456,11 +456,15 @@ impl CoreEngine {
             s.to_session_info(MonotonicInstant::now())
         });
 
+        // Build entry views for the snapshot
+        let entries = self.list_entries(Local::now());
+
         DaemonStateSnapshot {
             api_version: API_VERSION,
             policy_loaded: true,
             current_session,
             entry_count: self.policy.entries.len(),
+            entries,
         }
     }
 

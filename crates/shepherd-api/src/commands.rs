@@ -212,6 +212,7 @@ mod tests {
                 policy_loaded: true,
                 current_session: None,
                 entry_count: 5,
+                entries: vec![],
             }),
         );
 

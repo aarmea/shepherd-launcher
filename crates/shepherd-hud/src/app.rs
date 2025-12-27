@@ -1,0 +1,459 @@
+//! HUD Application
+//!
+//! The main GTK4 application for the HUD overlay.
+//! Uses gtk4-layer-shell to create an always-visible overlay.
+
+use crate::battery::BatteryStatus;
+use crate::state::{SessionState, SharedState};
+use crate::time_display::TimeDisplay;
+use crate::volume::VolumeStatus;
+use gtk4::glib;
+use gtk4::prelude::*;
+use gtk4_layer_shell::{Edge, Layer, LayerShell};
+use shepherd_api::commands::Command;
+use shepherd_ipc::IpcClient;
+use std::cell::RefCell;
+use std::path::PathBuf;
+use std::rc::Rc;
+use std::time::Duration;
+use tokio::runtime::Runtime;
+
+/// The HUD application
+pub struct HudApp {
+    app: gtk4::Application,
+    socket_path: PathBuf,
+    anchor: String,
+    height: i32,
+}
+
+impl HudApp {
+    pub fn new(socket_path: PathBuf, anchor: String, height: i32) -> Self {
+        let app = gtk4::Application::builder()
+            .application_id("org.shepherd.hud")
+            .build();
+
+        Self {
+            app,
+            socket_path,
+            anchor,
+            height,
+        }
+    }
+
+    pub fn run(&self) -> i32 {
+        let socket_path = self.socket_path.clone();
+        let anchor = self.anchor.clone();
+        let height = self.height;
+
+        self.app.connect_activate(move |app| {
+            let state = SharedState::new();
+            let window = build_hud_window(app, &anchor, height, state.clone());
+
+            // Start the IPC event listener
+            let state_clone = state.clone();
+            let socket_clone = socket_path.clone();
+            std::thread::spawn(move || {
+                if let Err(e) = run_event_loop(socket_clone, state_clone) {
+                    tracing::error!("Event loop error: {}", e);
+                }
+            });
+
+            // Start periodic updates for battery/volume
+            start_metrics_updates(state.clone());
+
+            // Subscribe to state changes
+            let window_clone = window.clone();
+            let state_clone = state.clone();
+            glib::timeout_add_local(Duration::from_millis(100), move || {
+                let session_state = state_clone.session_state();
+                let visible = session_state.is_visible();
+                window_clone.set_visible(visible);
+                glib::ControlFlow::Continue
+            });
+
+            window.present();
+        });
+
+        self.app.run().into()
+    }
+}
+
+fn build_hud_window(
+    app: &gtk4::Application,
+    anchor: &str,
+    height: i32,
+    state: SharedState,
+) -> gtk4::ApplicationWindow {
+    let window = gtk4::ApplicationWindow::builder()
+        .application(app)
+        .default_height(height)
+        .decorated(false)
+        .build();
+
+    // Initialize layer shell
+    window.init_layer_shell();
+    window.set_layer(Layer::Overlay);
+    window.set_namespace("shepherd-hud");
+
+    // Set anchors based on position
+    match anchor {
+        "bottom" => {
+            window.set_anchor(Edge::Bottom, true);
+            window.set_anchor(Edge::Left, true);
+            window.set_anchor(Edge::Right, true);
+        }
+        _ => {
+            // Default to top
+            window.set_anchor(Edge::Top, true);
+            window.set_anchor(Edge::Left, true);
+            window.set_anchor(Edge::Right, true);
+        }
+    }
+
+    // Set exclusive zone so other windows don't overlap
+    window.set_exclusive_zone(height);
+
+    // Load CSS
+    load_css();
+
+    // Build the HUD content
+    let content = build_hud_content(state);
+    window.set_child(Some(&content));
+
+    window
+}
+
+fn build_hud_content(state: SharedState) -> gtk4::Box {
+    let container = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(16)
+        .margin_start(12)
+        .margin_end(12)
+        .margin_top(6)
+        .margin_bottom(6)
+        .hexpand(true)
+        .build();
+
+    container.add_css_class("hud-bar");
+
+    // Left section: App name and time
+    let left_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(12)
+        .hexpand(true)
+        .halign(gtk4::Align::Start)
+        .build();
+
+    let app_label = gtk4::Label::new(Some("No session"));
+    app_label.add_css_class("app-name");
+    left_box.append(&app_label);
+
+    let time_display = TimeDisplay::new();
+    left_box.append(&time_display);
+
+    container.append(&left_box);
+
+    // Center section: Warning banner (hidden by default)
+    let warning_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(8)
+        .halign(gtk4::Align::Center)
+        .visible(false)
+        .build();
+
+    let warning_icon = gtk4::Image::from_icon_name("dialog-warning-symbolic");
+    warning_icon.set_pixel_size(20);
+    warning_box.append(&warning_icon);
+
+    let warning_label = gtk4::Label::new(Some("Time running out!"));
+    warning_label.add_css_class("warning-text");
+    warning_box.append(&warning_label);
+
+    warning_box.add_css_class("warning-banner");
+    container.append(&warning_box);
+
+    // Right section: System indicators and close button
+    let right_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(8)
+        .halign(gtk4::Align::End)
+        .build();
+
+    // Volume indicator
+    let volume_button = gtk4::Button::builder()
+        .icon_name("audio-volume-medium-symbolic")
+        .has_frame(false)
+        .build();
+    volume_button.add_css_class("indicator-button");
+    volume_button.connect_clicked(|_| {
+        if let Err(e) = VolumeStatus::toggle_mute() {
+            tracing::error!("Failed to toggle mute: {}", e);
+        }
+    });
+    right_box.append(&volume_button);
+
+    // Battery indicator
+    let battery_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+
+    let battery_icon = gtk4::Image::from_icon_name("battery-good-symbolic");
+    battery_icon.set_pixel_size(20);
+    battery_box.append(&battery_icon);
+
+    let battery_label = gtk4::Label::new(Some("--%"));
+    battery_label.add_css_class("battery-label");
+    battery_box.append(&battery_label);
+
+    right_box.append(&battery_box);
+
+    // Pause button
+    let pause_button = gtk4::Button::builder()
+        .icon_name("media-playback-pause-symbolic")
+        .has_frame(false)
+        .tooltip_text("Pause session")
+        .build();
+    pause_button.add_css_class("control-button");
+
+    let state_for_pause = state.clone();
+    pause_button.connect_clicked(move |btn| {
+        let session_state = state_for_pause.session_state();
+        if let Some(session_id) = session_state.session_id() {
+            // Toggle pause state - this would need to send command to daemon
+            // For now, just log
+            tracing::info!("Pause toggled for session {}", session_id);
+        }
+        // Toggle icon
+        let icon_name = btn.icon_name().unwrap_or_default();
+        if icon_name == "media-playback-pause-symbolic" {
+            btn.set_icon_name("media-playback-start-symbolic");
+            btn.set_tooltip_text(Some("Resume session"));
+        } else {
+            btn.set_icon_name("media-playback-pause-symbolic");
+            btn.set_tooltip_text(Some("Pause session"));
+        }
+    });
+    right_box.append(&pause_button);
+
+    // Close button
+    let close_button = gtk4::Button::builder()
+        .icon_name("window-close-symbolic")
+        .has_frame(false)
+        .tooltip_text("End session")
+        .build();
+    close_button.add_css_class("close-button");
+
+    let state_for_close = state.clone();
+    close_button.connect_clicked(move |_| {
+        let session_state = state_for_close.session_state();
+        if let Some(session_id) = session_state.session_id() {
+            tracing::info!("Requesting end session for {}", session_id);
+            // This would need to send EndSession command to daemon
+        }
+    });
+    right_box.append(&close_button);
+
+    container.append(&right_box);
+
+    // Set up state updates
+    let app_label_clone = app_label.clone();
+    let time_display_clone = time_display.clone();
+    let warning_box_clone = warning_box.clone();
+    let warning_label_clone = warning_label.clone();
+    let battery_icon_clone = battery_icon.clone();
+    let battery_label_clone = battery_label.clone();
+    let volume_button_clone = volume_button.clone();
+
+    glib::timeout_add_local(Duration::from_millis(500), move || {
+        // Update session state
+        let session_state = state.session_state();
+        match &session_state {
+            SessionState::NoSession => {
+                app_label_clone.set_text("No session");
+                time_display_clone.set_remaining(None);
+                warning_box_clone.set_visible(false);
+            }
+            SessionState::Active {
+                entry_name,
+                time_remaining_secs,
+                paused,
+                ..
+            } => {
+                app_label_clone.set_text(entry_name);
+                time_display_clone.set_remaining(*time_remaining_secs);
+                time_display_clone.set_paused(*paused);
+                warning_box_clone.set_visible(false);
+            }
+            SessionState::Warning {
+                entry_name,
+                time_remaining_secs,
+                ..
+            } => {
+                app_label_clone.set_text(entry_name);
+                time_display_clone.set_remaining(Some(*time_remaining_secs));
+                warning_label_clone.set_text(&format!(
+                    "Only {} seconds remaining!",
+                    time_remaining_secs
+                ));
+                warning_box_clone.set_visible(true);
+            }
+            SessionState::Ending { reason, .. } => {
+                app_label_clone.set_text("Session ending...");
+                warning_label_clone.set_text(reason);
+                warning_box_clone.set_visible(true);
+            }
+        }
+
+        // Update battery
+        let battery = BatteryStatus::read();
+        battery_icon_clone.set_icon_name(Some(battery.icon_name()));
+        if let Some(percent) = battery.percent {
+            battery_label_clone.set_text(&format!("{}%", percent));
+        } else {
+            battery_label_clone.set_text("--%");
+        }
+
+        // Update volume
+        let volume = VolumeStatus::read();
+        volume_button_clone.set_icon_name(volume.icon_name());
+
+        glib::ControlFlow::Continue
+    });
+
+    container
+}
+
+fn load_css() {
+    let css = r#"
+        .hud-bar {
+            background-color: rgba(30, 30, 30, 0.95);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .app-name {
+            font-weight: bold;
+            font-size: 14px;
+            color: white;
+        }
+
+        .time-display {
+            font-family: monospace;
+            font-size: 14px;
+            color: #88c0d0;
+        }
+
+        .time-display.time-warning {
+            color: #ebcb8b;
+        }
+
+        .time-display.time-critical {
+            color: #bf616a;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            50% { opacity: 0.5; }
+        }
+
+        .warning-banner {
+            background-color: rgba(235, 203, 139, 0.2);
+            border-radius: 4px;
+            padding: 4px 12px;
+        }
+
+        .warning-text {
+            color: #ebcb8b;
+            font-weight: bold;
+        }
+
+        .indicator-button,
+        .control-button {
+            min-width: 32px;
+            min-height: 32px;
+            padding: 4px;
+            border-radius: 4px;
+        }
+
+        .indicator-button:hover,
+        .control-button:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .close-button {
+            min-width: 32px;
+            min-height: 32px;
+            padding: 4px;
+            border-radius: 4px;
+            color: #bf616a;
+        }
+
+        .close-button:hover {
+            background-color: rgba(191, 97, 106, 0.3);
+        }
+
+        .battery-label {
+            font-size: 12px;
+            color: #a3be8c;
+        }
+    "#;
+
+    let provider = gtk4::CssProvider::new();
+    provider.load_from_data(css);
+
+    gtk4::style_context_add_provider_for_display(
+        &gtk4::gdk::Display::default().expect("Could not get display"),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+}
+
+fn run_event_loop(socket_path: PathBuf, state: SharedState) -> anyhow::Result<()> {
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        loop {
+            tracing::info!("Connecting to shepherdd at {:?}", socket_path);
+
+            match IpcClient::connect(&socket_path).await {
+                Ok(client) => {
+                    tracing::info!("Connected to shepherdd");
+
+                    let mut stream = match client.subscribe().await {
+                        Ok(stream) => stream,
+                        Err(e) => {
+                            tracing::error!("Failed to subscribe: {}", e);
+                            tokio::time::sleep(Duration::from_secs(1)).await;
+                            continue;
+                        }
+                    };
+
+                    loop {
+                        match stream.next().await {
+                            Ok(event) => {
+                                tracing::debug!("Received event: {:?}", event);
+                                state.handle_event(&event);
+                            }
+                            Err(e) => {
+                                tracing::error!("Event stream error: {}", e);
+                                break;
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to connect to shepherdd: {}", e);
+                }
+            }
+
+            // Wait before reconnecting
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
+    })
+}
+
+fn start_metrics_updates(_state: SharedState) {
+    // Battery and volume are now updated in the main UI loop
+    // This function could be used for more expensive operations
+    // that don't need to run as frequently
+}
