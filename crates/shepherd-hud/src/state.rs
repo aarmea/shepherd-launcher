@@ -148,18 +148,21 @@ impl SharedState {
                 deadline,
             } => {
                 let now = chrono::Local::now();
-                let time_remaining = if *deadline > now {
-                    (*deadline - now).num_seconds().max(0) as u64
-                } else {
-                    0
-                };
+                // For unlimited sessions (deadline=None), time_remaining is None
+                let time_remaining = deadline.and_then(|d| {
+                    if d > now {
+                        Some((d - now).num_seconds().max(0) as u64)
+                    } else {
+                        Some(0)
+                    }
+                });
                 self.set_session_state(SessionState::Active {
                     session_id: session_id.clone(),
                     entry_id: entry_id.clone(),
                     entry_name: label.clone(),
                     started_at: std::time::Instant::now(),
-                    time_limit_secs: Some(time_remaining),
-                    time_remaining_secs: Some(time_remaining),
+                    time_limit_secs: time_remaining,
+                    time_remaining_secs: time_remaining,
                     paused: false,
                 });
             }
@@ -208,18 +211,21 @@ impl SharedState {
             EventPayload::StateChanged(snapshot) => {
                 if let Some(session) = &snapshot.current_session {
                     let now = chrono::Local::now();
-                    let time_remaining = if session.deadline > now {
-                        (session.deadline - now).num_seconds().max(0) as u64
-                    } else {
-                        0
-                    };
+                    // For unlimited sessions (deadline=None), time_remaining is None
+                    let time_remaining = session.deadline.and_then(|d| {
+                        if d > now {
+                            Some((d - now).num_seconds().max(0) as u64)
+                        } else {
+                            Some(0)
+                        }
+                    });
                     self.set_session_state(SessionState::Active {
                         session_id: session.session_id.clone(),
                         entry_id: session.entry_id.clone(),
                         entry_name: session.label.clone(),
                         started_at: std::time::Instant::now(),
-                        time_limit_secs: Some(time_remaining),
-                        time_remaining_secs: Some(time_remaining),
+                        time_limit_secs: time_remaining,
+                        time_remaining_secs: time_remaining,
                         paused: false,
                     });
                 } else {

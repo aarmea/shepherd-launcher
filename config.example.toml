@@ -10,6 +10,7 @@ config_version = 1
 # data_dir = "/var/lib/shepherdd"
 
 # Default max run duration if not specified per entry (1 hour)
+# Set to 0 for unlimited (no time limit)
 default_max_run_seconds = 3600
 
 # Default warning thresholds
@@ -54,8 +55,9 @@ start = "10:00"
 end = "20:00"
 
 [entries.limits]
-max_run_seconds = 3600  # 1 hour max
-daily_quota_seconds = 7200  # 2 hours per day
+# Set max_run_seconds or daily_quota_seconds to 0 for unlimited
+max_run_seconds = 3600  # 1 hour max (0 = unlimited)
+daily_quota_seconds = 7200  # 2 hours per day (0 = unlimited)
 cooldown_seconds = 300  # 5 minute cooldown after each session
 
 # Example: Minecraft (via snap mc-installer)
@@ -106,8 +108,26 @@ argv = ["tuxmath"]
 [entries.availability]
 always = true
 
+# No [entries.limits] section - uses daemon defaults
+# Omitting limits entirely uses default_max_run_seconds
+
+# Example: YouTube video via mpv
+[[entries]]
+id = "lofi-beats"
+label = "Lofi Beats"
+icon = "mpv"
+
+[entries.kind]
+type = "process"
+argv = ["mpv", "https://www.youtube.com/watch?v=jfKfPfyJRdk"]
+
+[entries.availability]
+always = true
+
 [entries.limits]
-max_run_seconds = 7200  # 2 hours
+max_run_seconds = 0  # Unlimited: sleep/study aid
+daily_quota_seconds = 0  # Unlimited
+cooldown_seconds = 0  # No cooldown
 
 # Example: Disabled entry
 [[entries]]

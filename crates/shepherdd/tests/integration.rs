@@ -31,7 +31,7 @@ fn make_test_policy() -> Policy {
                     always: true,
                 },
                 limits: LimitsPolicy {
-                    max_run: Duration::from_secs(10), // Short for testing
+                    max_run: Some(Duration::from_secs(10)), // Short for testing
                     daily_quota: None,
                     cooldown: None,
                 },
@@ -52,7 +52,7 @@ fn make_test_policy() -> Policy {
             },
         ],
         default_warnings: vec![],
-        default_max_run: Duration::from_secs(3600),
+        default_max_run: Some(Duration::from_secs(3600)),
     }
 }
 
@@ -88,7 +88,7 @@ fn test_launch_approval() {
     let entry_id = EntryId::new("test-game");
     let decision = engine.request_launch(&entry_id, Local::now());
 
-    assert!(matches!(decision, LaunchDecision::Approved(plan) if plan.max_duration == Duration::from_secs(10)));
+    assert!(matches!(decision, LaunchDecision::Approved(plan) if plan.max_duration == Some(Duration::from_secs(10))));
 }
 
 #[test]
@@ -284,7 +284,7 @@ fn test_config_parsing() {
     let policy = parse_config(config).unwrap();
     assert_eq!(policy.entries.len(), 1);
     assert_eq!(policy.entries[0].id.as_str(), "scummvm");
-    assert_eq!(policy.entries[0].limits.max_run, Duration::from_secs(3600));
+    assert_eq!(policy.entries[0].limits.max_run, Some(Duration::from_secs(3600)));
     assert_eq!(policy.entries[0].limits.daily_quota, Some(Duration::from_secs(7200)));
     assert_eq!(policy.entries[0].limits.cooldown, Some(Duration::from_secs(300)));
     assert_eq!(policy.entries[0].warnings.len(), 1);
@@ -308,8 +308,8 @@ fn test_session_extension() {
     };
     engine.start_session(plan, now, now_mono);
 
-    // Get original deadline
-    let original_deadline = engine.current_session().unwrap().deadline;
+    // Get original deadline (should be Some for this test)
+    let original_deadline = engine.current_session().unwrap().deadline.expect("Expected deadline");
 
     // Extend by 5 minutes
     let new_deadline = engine.extend_current(Duration::from_secs(300), now_mono, now);

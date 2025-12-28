@@ -37,7 +37,8 @@ pub enum EventPayload {
         session_id: SessionId,
         entry_id: EntryId,
         label: String,
-        deadline: DateTime<Local>,
+        /// Deadline for session. None means unlimited.
+        deadline: Option<DateTime<Local>>,
     },
 
     /// Warning issued for current session
@@ -93,7 +94,7 @@ mod tests {
             session_id: SessionId::new(),
             entry_id: EntryId::new("game-1"),
             label: "Test Game".into(),
-            deadline: Local::now(),
+            deadline: Some(Local::now()),
         });
 
         let json = serde_json::to_string(&event).unwrap();
@@ -101,5 +102,26 @@ mod tests {
 
         assert_eq!(parsed.api_version, API_VERSION);
         assert!(matches!(parsed.payload, EventPayload::SessionStarted { .. }));
+    }
+
+    #[test]
+    fn event_serialization_unlimited() {
+        // Test with unlimited session (deadline=None)
+        let event = Event::new(EventPayload::SessionStarted {
+            session_id: SessionId::new(),
+            entry_id: EntryId::new("game-1"),
+            label: "Unlimited Game".into(),
+            deadline: None,
+        });
+
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: Event = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed.api_version, API_VERSION);
+        if let EventPayload::SessionStarted { deadline, .. } = parsed.payload {
+            assert!(deadline.is_none());
+        } else {
+            panic!("Expected SessionStarted");
+        }
     }
 }

@@ -667,11 +667,11 @@ impl Daemon {
                 let mut eng = engine.lock().await;
                 match eng.extend_current(by, now_mono, now) {
                     Some(new_deadline) => {
-                        Response::success(request_id, ResponsePayload::Extended { new_deadline })
+                        Response::success(request_id, ResponsePayload::Extended { new_deadline: Some(new_deadline) })
                     }
                     None => Response::error(
                         request_id,
-                        ErrorInfo::new(ErrorCode::NoActiveSession, "No active session"),
+                        ErrorInfo::new(ErrorCode::NoActiveSession, "No active session or session is unlimited"),
                     ),
                 }
             }

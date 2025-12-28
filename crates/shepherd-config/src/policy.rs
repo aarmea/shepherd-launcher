@@ -20,8 +20,8 @@ pub struct Policy {
     /// Default warning thresholds
     pub default_warnings: Vec<WarningThreshold>,
 
-    /// Default max run duration
-    pub default_max_run: Duration,
+    /// Default max run duration. None means unlimited.
+    pub default_max_run: Option<Duration>,
 }
 
 impl Policy {
@@ -34,11 +34,12 @@ impl Policy {
             .map(|w| w.into_iter().map(convert_warning).collect())
             .unwrap_or_else(default_warning_thresholds);
 
+        // 0 means unlimited, None means use 1 hour default
         let default_max_run = raw
             .daemon
             .default_max_run_seconds
-            .map(Duration::from_secs)
-            .unwrap_or(Duration::from_secs(3600)); // 1 hour default
+            .map(seconds_to_duration_or_unlimited)
+            .unwrap_or(Some(Duration::from_secs(3600))); // 1 hour default
 
         let entries = raw
             .entries
@@ -112,7 +113,7 @@ impl Entry {
     fn from_raw(
         raw: RawEntry,
         default_warnings: &[WarningThreshold],
-        default_max_run: Duration,
+        default_max_run: Option<Duration>,
     ) -> Self {
         let kind = convert_entry_kind(raw.kind);
         let availability = raw
@@ -124,7 +125,7 @@ impl Entry {
             .map(|l| convert_limits(l, default_max_run))
             .unwrap_or_else(|| LimitsPolicy {
                 max_run: default_max_run,
-                daily_quota: None,
+                daily_quota: None, // None means unlimited
                 cooldown: None,
             });
         let warnings = raw
@@ -182,7 +183,9 @@ impl AvailabilityPolicy {
 /// Time limits for an entry
 #[derive(Debug, Clone)]
 pub struct LimitsPolicy {
-    pub max_run: Duration,
+    /// Maximum run duration. None means unlimited.
+    pub max_run: Option<Duration>,
+    /// Daily quota. None means unlimited.
     pub daily_quota: Option<Duration>,
     pub cooldown: Option<Duration>,
 }
@@ -222,13 +225,24 @@ fn convert_time_window(raw: crate::schema::RawTimeWindow) -> TimeWindow {
     }
 }
 
-fn convert_limits(raw: crate::schema::RawLimits, default_max_run: Duration) -> LimitsPolicy {
+/// Convert seconds to Duration, treating 0 as "unlimited" (None)
+fn seconds_to_duration_or_unlimited(secs: u64) -> Option<Duration> {
+    if secs == 0 {
+        None // 0 means unlimited
+    } else {
+        Some(Duration::from_secs(secs))
+    }
+}
+
+fn convert_limits(raw: crate::schema::RawLimits, default_max_run: Option<Duration>) -> LimitsPolicy {
     LimitsPolicy {
         max_run: raw
             .max_run_seconds
-            .map(Duration::from_secs)
+            .map(seconds_to_duration_or_unlimited)
             .unwrap_or(default_max_run),
-        daily_quota: raw.daily_quota_seconds.map(Duration::from_secs),
+        daily_quota: raw
+            .daily_quota_seconds
+            .and_then(seconds_to_duration_or_unlimited),
         cooldown: raw.cooldown_seconds.map(Duration::from_secs),
     }
 }

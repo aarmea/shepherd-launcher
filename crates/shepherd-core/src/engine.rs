@@ -146,9 +146,9 @@ impl CoreEngine {
             }
         }
 
-        // Calculate max run if enabled
+        // Calculate max run if enabled (None when disabled, Some(None) flattened for unlimited)
         let max_run_if_started_now = if enabled {
-            Some(self.compute_max_duration(entry, now))
+            self.compute_max_duration(entry, now)
         } else {
             None
         };
@@ -164,13 +164,17 @@ impl CoreEngine {
         }
     }
 
-    /// Compute maximum duration for an entry if started now
-    fn compute_max_duration(&self, entry: &Entry, now: DateTime<Local>) -> Duration {
+    /// Compute maximum duration for an entry if started now.
+    /// Returns None if the entry has no time limit (unlimited).
+    fn compute_max_duration(&self, entry: &Entry, now: DateTime<Local>) -> Option<Duration> {
         let mut max = entry.limits.max_run;
 
         // Limit by time window remaining
         if let Some(window_remaining) = entry.availability.remaining_in_window(&now) {
-            max = max.min(window_remaining);
+            max = Some(match max {
+                Some(m) => m.min(window_remaining),
+                None => window_remaining,
+            });
         }
 
         // Limit by daily quota remaining
@@ -178,7 +182,10 @@ impl CoreEngine {
             let today = now.date_naive();
             if let Ok(used) = self.store.get_usage(&entry.id, today) {
                 let remaining = quota.saturating_sub(used);
-                max = max.min(remaining);
+                max = Some(match max {
+                    Some(m) => m.min(remaining),
+                    None => remaining,
+                });
             }
         }
 
@@ -219,7 +226,7 @@ impl CoreEngine {
         }
 
         // Compute session plan
-        let max_duration = view.max_run_if_started_now.unwrap();
+        let max_duration = view.max_run_if_started_now;
         let plan = SessionPlan {
             session_id: SessionId::new(),
             entry_id: entry_id.clone(),
@@ -228,11 +235,18 @@ impl CoreEngine {
             warnings: entry.warnings.clone(),
         };
 
-        debug!(
-            entry_id = %entry_id,
-            max_duration_secs = max_duration.as_secs(),
-            "Launch approved"
-        );
+        if let Some(max_dur) = max_duration {
+            debug!(
+                entry_id = %entry_id,
+                max_duration_secs = max_dur.as_secs(),
+                "Launch approved"
+            );
+        } else {
+            debug!(
+                entry_id = %entry_id,
+                "Launch approved (unlimited)"
+            );
+        }
 
         LaunchDecision::Approved(plan)
     }
@@ -261,12 +275,20 @@ impl CoreEngine {
             deadline: session.deadline,
         }));
 
-        info!(
-            session_id = %session.plan.session_id,
-            entry_id = %session.plan.entry_id,
-            deadline = %session.deadline,
-            "Session started"
-        );
+        if let Some(deadline) = session.deadline {
+            info!(
+                session_id = %session.plan.session_id,
+                entry_id = %session.plan.entry_id,
+                deadline = %deadline,
+                "Session started"
+            );
+        } else {
+            info!(
+                session_id = %session.plan.session_id,
+                entry_id = %session.plan.entry_id,
+                "Session started (unlimited)"
+            );
+        }
 
         self.current_session = Some(session);
 
@@ -484,6 +506,7 @@ impl CoreEngine {
     }
 
     /// Extend current session (admin action)
+    /// Only works for sessions with a deadline (not unlimited sessions).
     pub fn extend_current(
         &mut self,
         by: Duration,
@@ -492,24 +515,31 @@ impl CoreEngine {
     ) -> Option<DateTime<Local>> {
         let session = self.current_session.as_mut()?;
 
-        session.deadline_mono = session.deadline_mono + by;
-        session.deadline = session.deadline + chrono::Duration::from_std(by).unwrap();
+        // Can't extend unlimited sessions - they don't have a deadline
+        let deadline_mono = session.deadline_mono?;
+        let deadline = session.deadline?;
+
+        let new_deadline_mono = deadline_mono + by;
+        let new_deadline = deadline + chrono::Duration::from_std(by).unwrap();
+
+        session.deadline_mono = Some(new_deadline_mono);
+        session.deadline = Some(new_deadline);
 
         // Log to audit
         let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionExtended {
             session_id: session.plan.session_id.clone(),
             extended_by: by,
-            new_deadline: session.deadline,
+            new_deadline,
         }));
 
         info!(
             session_id = %session.plan.session_id,
             extended_by_secs = by.as_secs(),
-            new_deadline = %session.deadline,
+            new_deadline = %new_deadline,
             "Session extended"
         );
 
-        Some(session.deadline)
+        Some(new_deadline)
     }
 }
 
@@ -538,7 +568,7 @@ mod tests {
                     always: true,
                 },
                 limits: LimitsPolicy {
-                    max_run: Duration::from_secs(300),
+                    max_run: Some(Duration::from_secs(300)),
                     daily_quota: None,
                     cooldown: None,
                 },
@@ -547,7 +577,7 @@ mod tests {
                 disabled_reason: None,
             }],
             default_warnings: vec![],
-            default_max_run: Duration::from_secs(3600),
+            default_max_run: Some(Duration::from_secs(3600)),
         }
     }
 
@@ -614,7 +644,7 @@ mod tests {
                     always: true,
                 },
                 limits: LimitsPolicy {
-                    max_run: Duration::from_secs(120), // 2 minutes
+                    max_run: Some(Duration::from_secs(120)), // 2 minutes
                     daily_quota: None,
                     cooldown: None,
                 },
@@ -628,7 +658,7 @@ mod tests {
             }],
             daemon: Default::default(),
             default_warnings: vec![],
-            default_max_run: Duration::from_secs(3600),
+            default_max_run: Some(Duration::from_secs(3600)),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());
@@ -676,7 +706,7 @@ mod tests {
                     always: true,
                 },
                 limits: LimitsPolicy {
-                    max_run: Duration::from_secs(60),
+                    max_run: Some(Duration::from_secs(60)),
                     daily_quota: None,
                     cooldown: None,
                 },
@@ -686,7 +716,7 @@ mod tests {
             }],
             daemon: Default::default(),
             default_warnings: vec![],
-            default_max_run: Duration::from_secs(3600),
+            default_max_run: Some(Duration::from_secs(3600)),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());

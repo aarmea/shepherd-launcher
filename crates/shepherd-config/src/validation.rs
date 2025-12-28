@@ -105,22 +105,27 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
     }
 
     // Validate warning thresholds vs max_run
+    // Skip validation if max_run is 0 (unlimited) since there's no expiry to warn about
     let max_run = entry
         .limits
         .as_ref()
         .and_then(|l| l.max_run_seconds)
         .or(config.daemon.default_max_run_seconds);
 
+    // Only validate warnings if max_run is Some and not 0 (unlimited)
     if let (Some(warnings), Some(max_run)) = (&entry.warnings, max_run) {
-        for warning in warnings {
-            if warning.seconds_before >= max_run {
-                errors.push(ValidationError::WarningExceedsMaxRun {
-                    entry_id: entry.id.clone(),
-                    seconds: warning.seconds_before,
-                    max_run,
-                });
+        if max_run > 0 {
+            for warning in warnings {
+                if warning.seconds_before >= max_run {
+                    errors.push(ValidationError::WarningExceedsMaxRun {
+                        entry_id: entry.id.clone(),
+                        seconds: warning.seconds_before,
+                        max_run,
+                    });
+                }
             }
         }
+        // Note: warnings are ignored for unlimited entries (max_run = 0)
     }
 
     errors

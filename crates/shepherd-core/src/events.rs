@@ -13,7 +13,8 @@ pub enum CoreEvent {
         session_id: SessionId,
         entry_id: EntryId,
         label: String,
-        deadline: DateTime<Local>,
+        /// Deadline for session. None means unlimited.
+        deadline: Option<DateTime<Local>>,
     },
 
     /// Warning threshold reached

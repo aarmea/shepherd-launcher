@@ -74,11 +74,14 @@ impl SharedState {
             } => {
                 tracing::info!(session_id = %session_id, label = %label, "Session started event");
                 let now = chrono::Local::now();
-                let time_remaining = if deadline > now {
-                    (deadline - now).to_std().ok()
-                } else {
-                    Some(Duration::ZERO)
-                };
+                // For unlimited sessions (deadline=None), time_remaining is None
+                let time_remaining = deadline.and_then(|d| {
+                    if d > now {
+                        (d - now).to_std().ok()
+                    } else {
+                        Some(Duration::ZERO)
+                    }
+                });
                 self.set(LauncherState::SessionActive {
                     session_id,
                     entry_label: label,
@@ -118,11 +121,14 @@ impl SharedState {
     fn apply_snapshot(&self, snapshot: DaemonStateSnapshot) {
         if let Some(session) = snapshot.current_session {
             let now = chrono::Local::now();
-            let time_remaining = if session.deadline > now {
-                (session.deadline - now).to_std().ok()
-            } else {
-                Some(Duration::ZERO)
-            };
+            // For unlimited sessions (deadline=None), time_remaining is None
+            let time_remaining = session.deadline.and_then(|d| {
+                if d > now {
+                    (d - now).to_std().ok()
+                } else {
+                    Some(Duration::ZERO)
+                }
+            });
             self.set(LauncherState::SessionActive {
                 session_id: session.session_id,
                 entry_label: session.label,

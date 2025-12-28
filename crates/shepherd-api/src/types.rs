@@ -79,7 +79,9 @@ pub struct EntryView {
     pub kind_tag: EntryKindTag,
     pub enabled: bool,
     pub reasons: Vec<ReasonCode>,
-    /// If enabled, maximum run duration if started now
+    /// Maximum run duration if started now. None means:
+    /// - If enabled=false: entry is not available
+    /// - If enabled=true: entry has no time limit (unlimited)
     pub max_run_if_started_now: Option<Duration>,
 }
 
@@ -104,7 +106,8 @@ pub enum ReasonCode {
     /// Another session is active
     SessionActive {
         entry_id: EntryId,
-        remaining: Duration,
+        /// Time remaining in current session. None means unlimited.
+        remaining: Option<Duration>,
     },
     /// Host doesn't support this entry kind
     UnsupportedKind {
@@ -173,8 +176,10 @@ pub struct SessionInfo {
     pub label: String,
     pub state: SessionState,
     pub started_at: DateTime<Local>,
-    pub deadline: DateTime<Local>,
-    pub time_remaining: Duration,
+    /// Session deadline. None means unlimited (no time limit).
+    pub deadline: Option<DateTime<Local>>,
+    /// Time remaining. None means unlimited.
+    pub time_remaining: Option<Duration>,
     pub warnings_issued: Vec<u64>,
 }
 

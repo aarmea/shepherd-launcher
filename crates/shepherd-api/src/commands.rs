@@ -144,7 +144,8 @@ pub enum ResponsePayload {
     Entries(Vec<crate::EntryView>),
     LaunchApproved {
         session_id: shepherd_util::SessionId,
-        deadline: DateTime<Local>,
+        /// Deadline for the session. None means unlimited.
+        deadline: Option<DateTime<Local>>,
     },
     LaunchDenied {
         reasons: Vec<crate::ReasonCode>,
@@ -157,7 +158,8 @@ pub enum ResponsePayload {
     Unsubscribed,
     Health(crate::HealthStatus),
     Extended {
-        new_deadline: DateTime<Local>,
+        /// New deadline. None if session is unlimited (can't be extended).
+        new_deadline: Option<DateTime<Local>>,
     },
     Pong,
 }

@@ -12,19 +12,25 @@ pub struct SessionPlan {
     pub session_id: SessionId,
     pub entry_id: EntryId,
     pub label: String,
-    pub max_duration: Duration,
+    /// Maximum duration for this session. None means unlimited.
+    pub max_duration: Option<Duration>,
     pub warnings: Vec<WarningThreshold>,
 }
 
 impl SessionPlan {
     /// Compute warning times (as durations after start)
+    /// Returns empty vec for unlimited sessions.
     pub fn warning_times(&self) -> Vec<(u64, Duration)> {
+        let max_duration = match self.max_duration {
+            Some(d) => d,
+            None => return Vec::new(), // No warnings for unlimited sessions
+        };
         self.warnings
             .iter()
-            .filter(|w| Duration::from_secs(w.seconds_before) < self.max_duration)
+            .filter(|w| Duration::from_secs(w.seconds_before) < max_duration)
             .map(|w| {
                 let trigger_after =
-                    self.max_duration - Duration::from_secs(w.seconds_before);
+                    max_duration - Duration::from_secs(w.seconds_before);
                 (w.seconds_before, trigger_after)
             })
             .collect()
@@ -46,11 +52,11 @@ pub struct ActiveSession {
     /// Monotonic start time (for enforcement)
     pub started_at_mono: MonotonicInstant,
 
-    /// Wall-clock deadline (for display)
-    pub deadline: DateTime<Local>,
+    /// Wall-clock deadline (for display). None means unlimited.
+    pub deadline: Option<DateTime<Local>>,
 
-    /// Monotonic deadline (for enforcement)
-    pub deadline_mono: MonotonicInstant,
+    /// Monotonic deadline (for enforcement). None means unlimited.
+    pub deadline_mono: Option<MonotonicInstant>,
 
     /// Warning thresholds already issued (seconds before expiry)
     pub warnings_issued: Vec<u64>,
@@ -66,8 +72,14 @@ impl ActiveSession {
         now: DateTime<Local>,
         now_mono: MonotonicInstant,
     ) -> Self {
-        let deadline = now + chrono::Duration::from_std(plan.max_duration).unwrap();
-        let deadline_mono = now_mono + plan.max_duration;
+        let (deadline, deadline_mono) = match plan.max_duration {
+            Some(max_dur) => {
+                let deadline = now + chrono::Duration::from_std(max_dur).unwrap();
+                let deadline_mono = now_mono + max_dur;
+                (Some(deadline), Some(deadline_mono))
+            }
+            None => (None, None), // Unlimited session
+        };
 
         Self {
             plan,
@@ -87,20 +99,29 @@ impl ActiveSession {
         self.state = SessionState::Running;
     }
 
-    /// Get time remaining using monotonic time
-    pub fn time_remaining(&self, now_mono: MonotonicInstant) -> Duration {
-        self.deadline_mono.saturating_duration_until(now_mono)
+    /// Get time remaining using monotonic time. None means unlimited.
+    pub fn time_remaining(&self, now_mono: MonotonicInstant) -> Option<Duration> {
+        self.deadline_mono.map(|deadline| deadline.saturating_duration_until(now_mono))
     }
 
-    /// Check if session is expired
+    /// Check if session is expired (never true for unlimited sessions)
     pub fn is_expired(&self, now_mono: MonotonicInstant) -> bool {
-        now_mono >= self.deadline_mono
+        match self.deadline_mono {
+            Some(deadline) => now_mono >= deadline,
+            None => false, // Unlimited sessions never expire
+        }
     }
 
-    /// Get pending warnings (not yet issued) that should fire now
+    /// Get pending warnings (not yet issued) that should fire now.
+    /// Returns empty vec for unlimited sessions (no warnings to issue).
     pub fn pending_warnings(&self, now_mono: MonotonicInstant) -> Vec<(u64, Duration)> {
+        // Unlimited sessions don't have warnings
+        let remaining = match self.time_remaining(now_mono) {
+            Some(r) => r,
+            None => return Vec::new(),
+        };
+
         let elapsed = now_mono.duration_since(self.started_at_mono);
-        let remaining = self.time_remaining(now_mono);
 
         self.plan
             .warning_times()
@@ -173,7 +194,7 @@ mod tests {
             session_id: SessionId::new(),
             entry_id: EntryId::new("test"),
             label: "Test".into(),
-            max_duration: Duration::from_secs(duration_secs),
+            max_duration: Some(Duration::from_secs(duration_secs)),
             warnings: vec![
                 WarningThreshold {
                     seconds_before: 60,
@@ -199,7 +220,7 @@ mod tests {
 
         assert_eq!(session.state, SessionState::Launching);
         assert!(session.warnings_issued.is_empty());
-        assert_eq!(session.time_remaining(now_mono), Duration::from_secs(300));
+        assert_eq!(session.time_remaining(now_mono), Some(Duration::from_secs(300)));
     }
 
     #[test]
@@ -225,7 +246,7 @@ mod tests {
             session_id: SessionId::new(),
             entry_id: EntryId::new("test"),
             label: "Test".into(),
-            max_duration: Duration::from_secs(30), // 30 seconds
+            max_duration: Some(Duration::from_secs(30)), // 30 seconds
             warnings: vec![WarningThreshold {
                 seconds_before: 60, // 60 second warning - longer than session!
                 severity: WarningSeverity::Warn,

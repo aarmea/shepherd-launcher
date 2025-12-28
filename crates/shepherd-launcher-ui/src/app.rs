@@ -191,11 +191,14 @@ impl LauncherApp {
                                     shepherd_api::ResponsePayload::LaunchApproved { session_id, deadline } => {
                                         info!(session_id = %session_id, "Launch approved, setting SessionActive");
                                         let now = chrono::Local::now();
-                                        let time_remaining = if deadline > now {
-                                            (deadline - now).to_std().ok()
-                                        } else {
-                                            Some(std::time::Duration::ZERO)
-                                        };
+                                        // For unlimited sessions (deadline=None), time_remaining is None
+                                        let time_remaining = deadline.and_then(|d| {
+                                            if d > now {
+                                                (d - now).to_std().ok()
+                                            } else {
+                                                Some(std::time::Duration::ZERO)
+                                            }
+                                        });
                                         state.set(LauncherState::SessionActive {
                                             session_id,
                                             entry_label: entry_id.to_string(),
