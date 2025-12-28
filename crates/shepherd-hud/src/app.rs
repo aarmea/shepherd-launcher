@@ -11,9 +11,8 @@ use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use shepherd_api::Command;
 use shepherd_ipc::IpcClient;
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::mpsc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -216,7 +215,44 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         volume_slider.set_value(info.percent as f64);
     }
 
-    // Handle slider value changes
+    // Handle slider value changes with debouncing
+    // Create a channel for volume requests - the worker will debounce them
+    let (volume_tx, volume_rx) = mpsc::channel::<u8>();
+    
+    // Spawn a dedicated volume worker thread that debounces requests
+    std::thread::spawn(move || {
+        const DEBOUNCE_MS: u64 = 50; // Wait 50ms for more changes before sending
+        
+        loop {
+            // Wait for first volume request
+            let Ok(mut latest_percent) = volume_rx.recv() else {
+                break; // Channel closed
+            };
+            
+            // Drain any pending requests, keeping only the latest value
+            // Use a short timeout to debounce rapid changes
+            loop {
+                match volume_rx.recv_timeout(std::time::Duration::from_millis(DEBOUNCE_MS)) {
+                    Ok(percent) => {
+                        latest_percent = percent; // Update to latest value
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) => {
+                        // No more changes for DEBOUNCE_MS, send the request
+                        break;
+                    }
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        return; // Channel closed
+                    }
+                }
+            }
+            
+            // Send only the final value
+            if let Err(e) = crate::volume::set_volume(latest_percent) {
+                tracing::error!("Failed to set volume: {}", e);
+            }
+        }
+    });
+    
     let slider_changing = std::rc::Rc::new(std::cell::Cell::new(false));
     let slider_changing_clone = slider_changing.clone();
     
@@ -224,14 +260,10 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         slider_changing_clone.set(true);
         let percent = value.clamp(0.0, 100.0) as u8;
         
-        // Update in background thread to avoid blocking UI
-        std::thread::spawn(move || {
-            if let Err(e) = crate::volume::set_volume(percent) {
-                tracing::error!("Failed to set volume: {}", e);
-            }
-        });
+        // Send to debounce worker (non-blocking)
+        let _ = volume_tx.send(percent);
         
-        // Allow the slider to update
+        // Allow the slider to update immediately in UI
         slider.set_value(value);
         glib::Propagation::Stop
     });
@@ -371,8 +403,8 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
             battery_label_clone.set_text("--%");
         }
 
-        // Update volume from daemon
-        if let Some(volume) = crate::volume::get_volume_status() {
+        // Update volume from cached state (updated via events, no polling needed)
+        if let Some(volume) = state.volume_info() {
             volume_button_clone.set_icon_name(volume.icon_name());
             volume_label_clone.set_text(&format!("{}%", volume.percent));
             
@@ -555,8 +587,24 @@ fn run_event_loop(socket_path: PathBuf, state: SharedState) -> anyhow::Result<()
             tracing::info!("Connecting to shepherdd at {:?}", socket_path);
 
             match IpcClient::connect(&socket_path).await {
-                Ok(client) => {
+                Ok(mut client) => {
                     tracing::info!("Connected to shepherdd");
+
+                    // Get initial volume before subscribing (can't send commands after subscribe)
+                    match client.send(Command::GetVolume).await {
+                        Ok(response) => {
+                            if let shepherd_api::ResponseResult::Ok(
+                                shepherd_api::ResponsePayload::Volume(info),
+                            ) = response.result
+                            {
+                                tracing::debug!("Got initial volume: {}%", info.percent);
+                                state.set_initial_volume(info);
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to get initial volume: {}", e);
+                        }
+                    }
 
                     let mut stream = match client.subscribe().await {
                         Ok(stream) => stream,

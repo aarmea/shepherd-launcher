@@ -3,7 +3,7 @@
 //! The HUD subscribes to events from shepherdd and tracks session state.
 
 use chrono::Local;
-use shepherd_api::{Event, EventPayload, SessionEndReason};
+use shepherd_api::{Event, EventPayload, SessionEndReason, VolumeInfo, VolumeRestrictions};
 use shepherd_util::{EntryId, SessionId};
 use std::sync::Arc;
 use tokio::sync::watch;
@@ -84,18 +84,25 @@ pub struct SharedState {
     metrics_tx: Arc<watch::Sender<SystemMetrics>>,
     /// System metrics receiver
     metrics_rx: watch::Receiver<SystemMetrics>,
+    /// Volume info sender (updated via events, not polling)
+    volume_tx: Arc<watch::Sender<Option<VolumeInfo>>>,
+    /// Volume info receiver
+    volume_rx: watch::Receiver<Option<VolumeInfo>>,
 }
 
 impl SharedState {
     pub fn new() -> Self {
         let (session_tx, session_rx) = watch::channel(SessionState::NoSession);
         let (metrics_tx, metrics_rx) = watch::channel(SystemMetrics::default());
+        let (volume_tx, volume_rx) = watch::channel(None);
 
         Self {
             session_tx: Arc::new(session_tx),
             session_rx,
             metrics_tx: Arc::new(metrics_tx),
             metrics_rx,
+            volume_tx: Arc::new(volume_tx),
+            volume_rx,
         }
     }
 
@@ -122,6 +129,35 @@ impl SharedState {
     /// Update system metrics
     pub fn set_metrics(&self, metrics: SystemMetrics) {
         let _ = self.metrics_tx.send(metrics);
+    }
+
+    /// Get current volume info (cached from events)
+    pub fn volume_info(&self) -> Option<VolumeInfo> {
+        self.volume_rx.borrow().clone()
+    }
+
+    /// Set initial volume info (called once on connect)
+    pub fn set_initial_volume(&self, info: VolumeInfo) {
+        let _ = self.volume_tx.send(Some(info));
+    }
+
+    /// Update volume from VolumeChanged event (preserves restrictions from initial fetch)
+    fn update_volume(&self, percent: u8, muted: bool) {
+        self.volume_tx.send_modify(|vol| {
+            if let Some(v) = vol {
+                v.percent = percent;
+                v.muted = muted;
+            } else {
+                // If we don't have initial volume yet, create a basic one
+                *vol = Some(VolumeInfo {
+                    percent,
+                    muted,
+                    available: true,
+                    backend: None,
+                    restrictions: VolumeRestrictions::unrestricted(),
+                });
+            }
+        });
     }
 
     /// Update time remaining for current session
@@ -228,6 +264,10 @@ impl SharedState {
                 } else {
                     self.set_session_state(SessionState::NoSession);
                 }
+            }
+
+            EventPayload::VolumeChanged { percent, muted } => {
+                self.update_volume(*percent, *muted);
             }
 
             _ => {}
