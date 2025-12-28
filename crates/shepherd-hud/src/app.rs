@@ -210,34 +210,6 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
 
     right_box.append(&battery_box);
 
-    // Pause button
-    let pause_button = gtk4::Button::builder()
-        .icon_name("media-playback-pause-symbolic")
-        .has_frame(false)
-        .tooltip_text("Pause session")
-        .build();
-    pause_button.add_css_class("control-button");
-
-    let state_for_pause = state.clone();
-    pause_button.connect_clicked(move |btn| {
-        let session_state = state_for_pause.session_state();
-        if let Some(session_id) = session_state.session_id() {
-            // Toggle pause state - this would need to send command to daemon
-            // For now, just log
-            tracing::info!("Pause toggled for session {}", session_id);
-        }
-        // Toggle icon
-        let icon_name = btn.icon_name().unwrap_or_default();
-        if icon_name == "media-playback-pause-symbolic" {
-            btn.set_icon_name("media-playback-start-symbolic");
-            btn.set_tooltip_text(Some("Resume session"));
-        } else {
-            btn.set_icon_name("media-playback-pause-symbolic");
-            btn.set_tooltip_text(Some("Pause session"));
-        }
-    });
-    right_box.append(&pause_button);
-
     // Close button
     let close_button = gtk4::Button::builder()
         .icon_name("window-close-symbolic")
@@ -300,7 +272,6 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                 entry_name,
                 started_at,
                 time_limit_secs,
-                paused,
                 ..
             } => {
                 app_label_clone.set_text(entry_name);
@@ -310,7 +281,6 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                     limit.saturating_sub(elapsed)
                 });
                 time_display_clone.set_remaining(remaining);
-                time_display_clone.set_paused(*paused);
                 warning_box_clone.set_visible(false);
             }
             SessionState::Warning {

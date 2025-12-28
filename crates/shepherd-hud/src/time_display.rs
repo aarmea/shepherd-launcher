@@ -15,7 +15,6 @@ mod imp {
         pub label: RefCell<Option<gtk4::Label>>,
         pub total_secs: RefCell<Option<u64>>,
         pub remaining_secs: RefCell<Option<u64>>,
-        pub paused: RefCell<bool>,
     }
 
     #[glib::object_subclass]
@@ -76,28 +75,15 @@ impl TimeDisplay {
         self.update_display();
     }
 
-    /// Set paused state
-    pub fn set_paused(&self, paused: bool) {
-        let imp = self.imp();
-        *imp.paused.borrow_mut() = paused;
-        self.update_display();
-    }
-
     /// Update the display based on current state
     fn update_display(&self) {
         let imp = self.imp();
 
         if let Some(label) = imp.label.borrow().as_ref() {
             let remaining = *imp.remaining_secs.borrow();
-            let paused = *imp.paused.borrow();
 
             let text = if let Some(secs) = remaining {
-                let formatted = format_duration(secs);
-                if paused {
-                    format!("{} ⏸", formatted)
-                } else {
-                    formatted
-                }
+                format_duration(secs)
             } else {
                 "--:--".to_string()
             };

@@ -22,7 +22,6 @@ pub enum SessionState {
         started_at: std::time::Instant,
         time_limit_secs: Option<u64>,
         time_remaining_secs: Option<u64>,
-        paused: bool,
     },
 
     /// Warning shown - time running low
@@ -163,7 +162,6 @@ impl SharedState {
                     started_at: std::time::Instant::now(),
                     time_limit_secs: time_remaining,
                     time_remaining_secs: time_remaining,
-                    paused: false,
                 });
             }
 
@@ -226,7 +224,6 @@ impl SharedState {
                         started_at: std::time::Instant::now(),
                         time_limit_secs: time_remaining,
                         time_remaining_secs: time_remaining,
-                        paused: false,
                     });
                 } else {
                     self.set_session_state(SessionState::NoSession);
