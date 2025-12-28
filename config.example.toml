@@ -74,8 +74,9 @@ snap_name = "mc-installer"
 always = true  # No time restrictions
 
 [entries.limits]
-max_run_seconds = 5400  # 90 minutes
-daily_quota_seconds = 10800  # 3 hours per day
+max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
+daily_quota_seconds = 3600  # 1 hour per day
+cooldown_seconds = 600  # 10 minute cooldown
 
 [[entries.warnings]]
 seconds_before = 600
