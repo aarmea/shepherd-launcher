@@ -89,6 +89,9 @@ pub enum RawEntryKind {
         snap_name: String,
         /// Command to run (defaults to snap_name if not specified)
         command: Option<String>,
+        /// Additional command-line arguments
+        #[serde(default)]
+        args: Vec<String>,
         /// Additional environment variables
         #[serde(default)]
         env: HashMap<String, String>,

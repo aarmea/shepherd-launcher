@@ -118,10 +118,11 @@ impl HostAdapter for LinuxHost {
             EntryKind::Process { argv, env, cwd } => {
                 (argv.clone(), env.clone(), cwd.clone(), None)
             }
-            EntryKind::Snap { snap_name, command, env } => {
+            EntryKind::Snap { snap_name, command, args, env } => {
                 // For snap apps, the command defaults to the snap name
                 let cmd = command.clone().unwrap_or_else(|| snap_name.clone());
-                let argv = vec![cmd];
+                let mut argv = vec![cmd];
+                argv.extend(args.clone());
                 (argv, env.clone(), None, Some(snap_name.clone()))
             }
             EntryKind::Vm { driver, args } => {
