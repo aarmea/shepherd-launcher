@@ -25,6 +25,7 @@ window {
 }
 
 .launcher-tile {
+    background: #16213e;
     background-color: #16213e;
     border-radius: 16px;
     padding: 16px;
@@ -32,14 +33,18 @@ window {
     min-height: 140px;
     border: 2px solid transparent;
     transition: all 200ms ease;
+    color: #e0e0e0;
+    box-shadow: none;
 }
 
 .launcher-tile:hover {
+    background: #1f3460;
     background-color: #1f3460;
     border-color: #4a90d9;
 }
 
 .launcher-tile:active {
+    background: #0f3460;
     background-color: #0f3460;
 }
 
@@ -48,9 +53,14 @@ window {
 }
 
 .tile-label {
-    color: #ffffff;
+    color: #e0e0e0;
     font-size: 14px;
     font-weight: 500;
+}
+
+.launcher-tile image {
+    -gtk-icon-style: regular;
+    color: #e0e0e0;
 }
 
 .status-label {

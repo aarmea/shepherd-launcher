@@ -49,6 +49,7 @@ mod imp {
 
             obj.set_child(Some(&content));
             obj.add_css_class("launcher-tile");
+            obj.add_css_class("flat");
             obj.set_size_request(160, 160);
         }
     }
