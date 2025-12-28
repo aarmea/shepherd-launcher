@@ -218,6 +218,11 @@ impl ManagedProcess {
             }
         }
 
+        // Java AWT/Swing applications (like Minecraft) need this to work properly
+        // on non-reparenting window managers like Sway. Without this, Java apps may
+        // have focus issues or render incorrectly.
+        cmd.env("_JAVA_AWT_WM_NONREPARENTING", "1");
+
         // Special handling for WAYLAND_DISPLAY:
         // If SHEPHERD_WAYLAND_DISPLAY is set, use that instead of the inherited value.
         // This allows apps to be launched on a nested compositor while the daemon
