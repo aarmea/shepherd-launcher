@@ -6,7 +6,6 @@
 use crate::battery::BatteryStatus;
 use crate::state::{SessionState, SharedState};
 use crate::time_display::TimeDisplay;
-use crate::volume::VolumeStatus;
 use gtk4::glib;
 use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
@@ -181,18 +180,71 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         .halign(gtk4::Align::End)
         .build();
 
-    // Volume indicator
+    // Volume control with slider
+    let volume_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+    volume_box.add_css_class("volume-control");
+
+    // Mute button
     let volume_button = gtk4::Button::builder()
         .icon_name("audio-volume-medium-symbolic")
         .has_frame(false)
+        .tooltip_text("Toggle mute")
         .build();
     volume_button.add_css_class("indicator-button");
     volume_button.connect_clicked(|_| {
-        if let Err(e) = VolumeStatus::toggle_mute() {
+        if let Err(e) = crate::volume::toggle_mute() {
             tracing::error!("Failed to toggle mute: {}", e);
         }
     });
-    right_box.append(&volume_button);
+    volume_box.append(&volume_button);
+
+    // Volume slider
+    let volume_slider = gtk4::Scale::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .width_request(100)
+        .draw_value(false)
+        .build();
+    volume_slider.set_range(0.0, 100.0);
+    volume_slider.set_increments(5.0, 10.0);
+    volume_slider.add_css_class("volume-slider");
+
+    // Set initial value from daemon
+    if let Some(info) = crate::volume::get_volume_status() {
+        volume_slider.set_value(info.percent as f64);
+    }
+
+    // Handle slider value changes
+    let slider_changing = std::rc::Rc::new(std::cell::Cell::new(false));
+    let slider_changing_clone = slider_changing.clone();
+    
+    volume_slider.connect_change_value(move |slider, _, value| {
+        slider_changing_clone.set(true);
+        let percent = value.clamp(0.0, 100.0) as u8;
+        
+        // Update in background thread to avoid blocking UI
+        std::thread::spawn(move || {
+            if let Err(e) = crate::volume::set_volume(percent) {
+                tracing::error!("Failed to set volume: {}", e);
+            }
+        });
+        
+        // Allow the slider to update
+        slider.set_value(value);
+        glib::Propagation::Stop
+    });
+
+    volume_box.append(&volume_slider);
+
+    // Volume percentage label
+    let volume_label = gtk4::Label::new(Some("--%"));
+    volume_label.add_css_class("volume-label");
+    volume_label.set_width_chars(4);
+    volume_box.append(&volume_label);
+
+    right_box.append(&volume_box);
 
     // Battery indicator
     let battery_box = gtk4::Box::builder()
@@ -258,6 +310,9 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     let battery_icon_clone = battery_icon.clone();
     let battery_label_clone = battery_label.clone();
     let volume_button_clone = volume_button.clone();
+    let volume_slider_clone = volume_slider.clone();
+    let volume_label_clone = volume_label.clone();
+    let slider_changing_for_update = slider_changing.clone();
 
     glib::timeout_add_local(Duration::from_millis(500), move || {
         // Update session state
@@ -316,9 +371,31 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
             battery_label_clone.set_text("--%");
         }
 
-        // Update volume
-        let volume = VolumeStatus::read();
-        volume_button_clone.set_icon_name(volume.icon_name());
+        // Update volume from daemon
+        if let Some(volume) = crate::volume::get_volume_status() {
+            volume_button_clone.set_icon_name(volume.icon_name());
+            volume_label_clone.set_text(&format!("{}%", volume.percent));
+            
+            // Only update slider if user is not actively dragging it
+            if !slider_changing_for_update.get() {
+                volume_slider_clone.set_value(volume.percent as f64);
+            }
+            // Reset the changing flag after a short delay
+            slider_changing_for_update.set(false);
+            
+            // Disable slider when muted or when restrictions don't allow changes
+            let slider_enabled = !volume.muted && volume.restrictions.allow_change;
+            volume_slider_clone.set_sensitive(slider_enabled);
+            volume_button_clone.set_sensitive(volume.restrictions.allow_mute);
+            
+            // Update slider range based on restrictions
+            let min = volume.restrictions.min_volume.unwrap_or(0) as f64;
+            let max = volume.restrictions.max_volume.unwrap_or(100) as f64;
+            volume_slider_clone.set_range(min, max);
+        } else {
+            volume_label_clone.set_text("--%");
+            volume_slider_clone.set_sensitive(false);
+        }
 
         glib::ControlFlow::Continue
     });
@@ -415,6 +492,48 @@ fn load_css() {
         .battery-label {
             font-size: 12px;
             color: var(--text-primary);
+        }
+
+        .volume-control {
+            padding: 0 4px;
+        }
+
+        .volume-slider {
+            min-width: 80px;
+        }
+
+        .volume-slider trough {
+            min-height: 4px;
+            border-radius: 2px;
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .volume-slider highlight {
+            min-height: 4px;
+            border-radius: 2px;
+            background-color: var(--color-info);
+        }
+
+        .volume-slider slider {
+            min-width: 12px;
+            min-height: 12px;
+            border-radius: 50%;
+            background-color: var(--text-primary);
+        }
+
+        .volume-slider:disabled trough {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .volume-slider:disabled highlight {
+            background-color: rgba(136, 192, 208, 0.5);
+        }
+
+        .volume-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 3em;
+            text-align: right;
         }
     "#;
 

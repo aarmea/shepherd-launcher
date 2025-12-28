@@ -115,6 +115,9 @@ impl SharedState {
             EventPayload::AuditEntry { .. } => {
                 // Audit events are for admin clients, ignore
             }
+            EventPayload::VolumeChanged { .. } => {
+                // Volume events are handled by HUD
+            }
         }
     }
 

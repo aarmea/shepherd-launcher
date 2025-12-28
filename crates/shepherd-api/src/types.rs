@@ -249,6 +249,70 @@ pub struct HealthStatus {
     pub store_ok: bool,
 }
 
+/// Volume status information
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VolumeInfo {
+    /// Volume percentage (0-100)
+    pub percent: u8,
+    /// Whether audio is muted
+    pub muted: bool,
+    /// Whether volume control is available
+    pub available: bool,
+    /// The detected sound backend (e.g., "pipewire", "pulseaudio", "alsa")
+    pub backend: Option<String>,
+    /// Current restrictions on volume
+    pub restrictions: VolumeRestrictions,
+}
+
+/// Volume restrictions that are currently in effect
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VolumeRestrictions {
+    /// Maximum volume percentage allowed
+    pub max_volume: Option<u8>,
+    /// Minimum volume percentage allowed
+    pub min_volume: Option<u8>,
+    /// Whether mute toggle is allowed
+    pub allow_mute: bool,
+    /// Whether volume changes are allowed at all
+    pub allow_change: bool,
+}
+
+impl VolumeRestrictions {
+    /// Create unrestricted volume settings
+    pub fn unrestricted() -> Self {
+        Self {
+            max_volume: None,
+            min_volume: None,
+            allow_mute: true,
+            allow_change: true,
+        }
+    }
+
+    /// Clamp a volume value to the allowed range
+    pub fn clamp_volume(&self, percent: u8) -> u8 {
+        let min = self.min_volume.unwrap_or(0);
+        let max = self.max_volume.unwrap_or(100);
+        percent.clamp(min, max)
+    }
+}
+
+impl VolumeInfo {
+    /// Get an icon name for the current volume status
+    pub fn icon_name(&self) -> &'static str {
+        if self.muted {
+            "audio-volume-muted-symbolic"
+        } else if self.percent == 0 {
+            "audio-volume-muted-symbolic"
+        } else if self.percent < 33 {
+            "audio-volume-low-symbolic"
+        } else if self.percent < 66 {
+            "audio-volume-medium-symbolic"
+        } else {
+            "audio-volume-high-symbolic"
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

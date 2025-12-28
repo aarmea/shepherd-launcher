@@ -36,6 +36,10 @@ pub struct RawDaemonConfig {
 
     /// Default max run duration
     pub default_max_run_seconds: Option<u64>,
+
+    /// Global volume restrictions
+    #[serde(default)]
+    pub volume: Option<RawVolumeConfig>,
 }
 
 /// Raw entry definition
@@ -64,6 +68,10 @@ pub struct RawEntry {
     /// Warning configuration
     #[serde(default)]
     pub warnings: Option<Vec<RawWarningThreshold>>,
+
+    /// Volume restrictions for this entry (overrides global)
+    #[serde(default)]
+    pub volume: Option<RawVolumeConfig>,
 
     /// Explicitly disabled
     #[serde(default)]
@@ -179,6 +187,28 @@ pub struct RawWarningThreshold {
 
 fn default_severity() -> String {
     "warn".to_string()
+}
+
+/// Volume control configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RawVolumeConfig {
+    /// Maximum volume percentage allowed (0-100)
+    pub max_volume: Option<u8>,
+
+    /// Minimum volume percentage allowed (0-100)
+    pub min_volume: Option<u8>,
+
+    /// Whether mute toggle is allowed (default: true)
+    #[serde(default = "default_true")]
+    pub allow_mute: bool,
+
+    /// Whether volume changes are allowed at all (default: true)
+    #[serde(default = "default_true")]
+    pub allow_change: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[cfg(test)]

@@ -127,6 +127,26 @@ pub enum Command {
     /// Get health status
     GetHealth,
 
+    // Volume control commands
+
+    /// Get current volume status
+    GetVolume,
+
+    /// Set volume to a specific percentage
+    SetVolume { percent: u8 },
+
+    /// Increase volume by a step
+    VolumeUp { step: u8 },
+
+    /// Decrease volume by a step
+    VolumeDown { step: u8 },
+
+    /// Toggle mute state
+    ToggleMute,
+
+    /// Set mute state explicitly
+    SetMute { muted: bool },
+
     // Admin commands
 
     /// Extend the current session (admin only)
@@ -160,6 +180,11 @@ pub enum ResponsePayload {
     Extended {
         /// New deadline. None if session is unlimited (can't be extended).
         new_deadline: Option<DateTime<Local>>,
+    },
+    Volume(crate::VolumeInfo),
+    VolumeSet,
+    VolumeDenied {
+        reason: String,
     },
     Pong,
 }

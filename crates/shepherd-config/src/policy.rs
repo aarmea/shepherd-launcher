@@ -1,6 +1,6 @@
 //! Validated policy structures
 
-use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawWarningThreshold};
+use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawVolumeConfig, RawWarningThreshold};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock};
@@ -22,6 +22,9 @@ pub struct Policy {
 
     /// Default max run duration. None means unlimited.
     pub default_max_run: Option<Duration>,
+
+    /// Global volume restrictions
+    pub volume: VolumePolicy,
 }
 
 impl Policy {
@@ -41,10 +44,17 @@ impl Policy {
             .map(seconds_to_duration_or_unlimited)
             .unwrap_or(Some(Duration::from_secs(3600))); // 1 hour default
 
+        let global_volume = raw
+            .daemon
+            .volume
+            .as_ref()
+            .map(convert_volume_config)
+            .unwrap_or_default();
+
         let entries = raw
             .entries
             .into_iter()
-            .map(|e| Entry::from_raw(e, &default_warnings, default_max_run))
+            .map(|e| Entry::from_raw(e, &default_warnings, default_max_run, &global_volume))
             .collect();
 
         Self {
@@ -52,6 +62,7 @@ impl Policy {
             entries,
             default_warnings,
             default_max_run,
+            volume: global_volume,
         }
     }
 
@@ -105,6 +116,7 @@ pub struct Entry {
     pub availability: AvailabilityPolicy,
     pub limits: LimitsPolicy,
     pub warnings: Vec<WarningThreshold>,
+    pub volume: Option<VolumePolicy>,
     pub disabled: bool,
     pub disabled_reason: Option<String>,
 }
@@ -114,6 +126,7 @@ impl Entry {
         raw: RawEntry,
         default_warnings: &[WarningThreshold],
         default_max_run: Option<Duration>,
+        _global_volume: &VolumePolicy,
     ) -> Self {
         let kind = convert_entry_kind(raw.kind);
         let availability = raw
@@ -132,6 +145,7 @@ impl Entry {
             .warnings
             .map(|w| w.into_iter().map(convert_warning).collect())
             .unwrap_or_else(|| default_warnings.to_vec());
+        let volume = raw.volume.as_ref().map(convert_volume_config);
 
         Self {
             id: EntryId::new(raw.id),
@@ -141,6 +155,7 @@ impl Entry {
             availability,
             limits,
             warnings,
+            volume,
             disabled: raw.disabled,
             disabled_reason: raw.disabled_reason,
         }
@@ -190,6 +205,38 @@ pub struct LimitsPolicy {
     pub cooldown: Option<Duration>,
 }
 
+/// Volume control policy
+#[derive(Debug, Clone, Default)]
+pub struct VolumePolicy {
+    /// Maximum volume percentage allowed (enforced by daemon)
+    pub max_volume: Option<u8>,
+    /// Minimum volume percentage allowed (enforced by daemon)
+    pub min_volume: Option<u8>,
+    /// Whether mute toggle is allowed
+    pub allow_mute: bool,
+    /// Whether volume changes are allowed at all
+    pub allow_change: bool,
+}
+
+impl VolumePolicy {
+    /// Create unrestricted volume settings
+    pub fn unrestricted() -> Self {
+        Self {
+            max_volume: None,
+            min_volume: None,
+            allow_mute: true,
+            allow_change: true,
+        }
+    }
+
+    /// Clamp a volume value to the allowed range
+    pub fn clamp_volume(&self, percent: u8) -> u8 {
+        let min = self.min_volume.unwrap_or(0);
+        let max = self.max_volume.unwrap_or(100);
+        percent.clamp(min, max)
+    }
+}
+
 // Conversion helpers
 
 fn convert_entry_kind(raw: RawEntryKind) -> EntryKind {
@@ -210,6 +257,15 @@ fn convert_availability(raw: crate::schema::RawAvailability) -> AvailabilityPoli
     AvailabilityPolicy {
         windows,
         always: raw.always,
+    }
+}
+
+fn convert_volume_config(raw: &RawVolumeConfig) -> VolumePolicy {
+    VolumePolicy {
+        max_volume: raw.max_volume,
+        min_volume: raw.min_volume,
+        allow_mute: raw.allow_mute,
+        allow_change: raw.allow_change,
     }
 }
 

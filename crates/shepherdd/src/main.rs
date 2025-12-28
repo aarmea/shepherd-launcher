@@ -7,18 +7,20 @@
 //! - Core engine
 //! - Host adapter (Linux)
 //! - IPC server
+//! - Volume control
 
 use anyhow::{Context, Result};
 use chrono::Local;
 use clap::Parser;
 use shepherd_api::{
     Command, DaemonStateSnapshot, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
-    Response, ResponsePayload, SessionEndReason, StopMode, API_VERSION,
+    Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
+    API_VERSION,
 };
-use shepherd_config::{load_config, Policy};
+use shepherd_config::{load_config, Policy, VolumePolicy};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision, StopDecision};
-use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode};
-use shepherd_host_linux::LinuxHost;
+use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode, VolumeController};
+use shepherd_host_linux::{LinuxHost, LinuxVolumeController};
 use shepherd_ipc::{IpcServer, ServerMessage};
 use shepherd_store::{AuditEvent, AuditEventType, SqliteStore, Store};
 use shepherd_util::{ClientId, EntryId, MonotonicInstant, RateLimiter};
@@ -55,6 +57,7 @@ struct Args {
 struct Daemon {
     engine: CoreEngine,
     host: Arc<LinuxHost>,
+    volume: Arc<LinuxVolumeController>,
     ipc: Arc<IpcServer>,
     store: Arc<dyn Store>,
     rate_limiter: RateLimiter,
@@ -102,6 +105,17 @@ impl Daemon {
         // Initialize host adapter
         let host = Arc::new(LinuxHost::new());
 
+        // Initialize volume controller
+        let volume = Arc::new(LinuxVolumeController::new());
+        if volume.capabilities().available {
+            info!(
+                backend = ?volume.capabilities().backend,
+                "Volume controller initialized"
+            );
+        } else {
+            warn!("No sound backend detected, volume control unavailable");
+        }
+
         // Initialize core engine
         let engine = CoreEngine::new(policy, store.clone(), host.capabilities().clone());
 
@@ -117,6 +131,7 @@ impl Daemon {
         Ok(Self {
             engine,
             host,
+            volume,
             ipc: Arc::new(ipc),
             store,
             rate_limiter,
@@ -139,6 +154,7 @@ impl Daemon {
         let engine = Arc::new(Mutex::new(self.engine));
         let rate_limiter = Arc::new(Mutex::new(self.rate_limiter));
         let host = self.host.clone();
+        let volume = self.volume.clone();
         let store = self.store.clone();
 
         // Spawn IPC accept task
@@ -179,7 +195,7 @@ impl Daemon {
 
                 // IPC messages
                 Some(msg) = ipc_messages.recv() => {
-                    Self::handle_ipc_message(&engine, &host, &ipc_ref, &store, &rate_limiter, msg).await;
+                    Self::handle_ipc_message(&engine, &host, &volume, &ipc_ref, &store, &rate_limiter, msg).await;
                 }
             }
         }
@@ -367,6 +383,7 @@ impl Daemon {
     async fn handle_ipc_message(
         engine: &Arc<Mutex<CoreEngine>>,
         host: &Arc<LinuxHost>,
+        volume: &Arc<LinuxVolumeController>,
         ipc: &Arc<IpcServer>,
         store: &Arc<dyn Store>,
         rate_limiter: &Arc<Mutex<RateLimiter>>,
@@ -388,7 +405,7 @@ impl Daemon {
                 }
 
                 let response =
-                    Self::handle_command(engine, host, ipc, store, &client_id, request.request_id, request.command)
+                    Self::handle_command(engine, host, volume, ipc, store, &client_id, request.request_id, request.command)
                         .await;
 
                 let _ = ipc.send_response(&client_id, response).await;
@@ -430,6 +447,7 @@ impl Daemon {
     async fn handle_command(
         engine: &Arc<Mutex<CoreEngine>>,
         host: &Arc<LinuxHost>,
+        volume: &Arc<LinuxVolumeController>,
         ipc: &Arc<IpcServer>,
         store: &Arc<dyn Store>,
         client_id: &ClientId,
@@ -676,7 +694,231 @@ impl Daemon {
                 }
             }
 
+            Command::GetVolume => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                match volume.get_status().await {
+                    Ok(status) => {
+                        let info = VolumeInfo {
+                            percent: status.percent,
+                            muted: status.muted,
+                            available: volume.capabilities().available,
+                            backend: volume.capabilities().backend.clone(),
+                            restrictions,
+                        };
+                        Response::success(request_id, ResponsePayload::Volume(info))
+                    }
+                    Err(e) => {
+                        let info = VolumeInfo {
+                            percent: 0,
+                            muted: false,
+                            available: false,
+                            backend: None,
+                            restrictions,
+                        };
+                        warn!(error = %e, "Failed to get volume status");
+                        Response::success(request_id, ResponsePayload::Volume(info))
+                    }
+                }
+            }
+
+            Command::SetVolume { percent } => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                if !restrictions.allow_change {
+                    return Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: "Volume changes are not allowed".into(),
+                        },
+                    );
+                }
+
+                let clamped = restrictions.clamp_volume(percent);
+
+                match volume.set_volume(clamped).await {
+                    Ok(()) => {
+                        // Broadcast volume change
+                        if let Ok(status) = volume.get_status().await {
+                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
+                                percent: status.percent,
+                                muted: status.muted,
+                            }));
+                        }
+                        Response::success(request_id, ResponsePayload::VolumeSet)
+                    }
+                    Err(e) => Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: e.to_string(),
+                        },
+                    ),
+                }
+            }
+
+            Command::VolumeUp { step } => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                if !restrictions.allow_change {
+                    return Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: "Volume changes are not allowed".into(),
+                        },
+                    );
+                }
+
+                // Get current volume and check if we'd exceed max
+                let current = volume.get_status().await.map(|s| s.percent).unwrap_or(0);
+                let target = current.saturating_add(step);
+                let clamped = restrictions.clamp_volume(target);
+
+                match volume.set_volume(clamped).await {
+                    Ok(()) => {
+                        if let Ok(status) = volume.get_status().await {
+                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
+                                percent: status.percent,
+                                muted: status.muted,
+                            }));
+                        }
+                        Response::success(request_id, ResponsePayload::VolumeSet)
+                    }
+                    Err(e) => Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: e.to_string(),
+                        },
+                    ),
+                }
+            }
+
+            Command::VolumeDown { step } => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                if !restrictions.allow_change {
+                    return Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: "Volume changes are not allowed".into(),
+                        },
+                    );
+                }
+
+                // Get current volume and check if we'd go below min
+                let current = volume.get_status().await.map(|s| s.percent).unwrap_or(0);
+                let target = current.saturating_sub(step);
+                let clamped = restrictions.clamp_volume(target);
+
+                match volume.set_volume(clamped).await {
+                    Ok(()) => {
+                        if let Ok(status) = volume.get_status().await {
+                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
+                                percent: status.percent,
+                                muted: status.muted,
+                            }));
+                        }
+                        Response::success(request_id, ResponsePayload::VolumeSet)
+                    }
+                    Err(e) => Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: e.to_string(),
+                        },
+                    ),
+                }
+            }
+
+            Command::ToggleMute => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                if !restrictions.allow_mute {
+                    return Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: "Mute toggle is not allowed".into(),
+                        },
+                    );
+                }
+
+                match volume.toggle_mute().await {
+                    Ok(()) => {
+                        if let Ok(status) = volume.get_status().await {
+                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
+                                percent: status.percent,
+                                muted: status.muted,
+                            }));
+                        }
+                        Response::success(request_id, ResponsePayload::VolumeSet)
+                    }
+                    Err(e) => Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: e.to_string(),
+                        },
+                    ),
+                }
+            }
+
+            Command::SetMute { muted } => {
+                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+
+                if !restrictions.allow_mute {
+                    return Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: "Mute toggle is not allowed".into(),
+                        },
+                    );
+                }
+
+                match volume.set_mute(muted).await {
+                    Ok(()) => {
+                        if let Ok(status) = volume.get_status().await {
+                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
+                                percent: status.percent,
+                                muted: status.muted,
+                            }));
+                        }
+                        Response::success(request_id, ResponsePayload::VolumeSet)
+                    }
+                    Err(e) => Response::success(
+                        request_id,
+                        ResponsePayload::VolumeDenied {
+                            reason: e.to_string(),
+                        },
+                    ),
+                }
+            }
+
             Command::Ping => Response::success(request_id, ResponsePayload::Pong),
+        }
+    }
+
+    /// Get the current volume restrictions based on policy and active session
+    async fn get_current_volume_restrictions(
+        engine: &Arc<Mutex<CoreEngine>>,
+    ) -> VolumeRestrictions {
+        let eng = engine.lock().await;
+        
+        // Check if there's an active session with volume restrictions
+        if let Some(session) = eng.current_session() {
+            if let Some(entry) = eng.policy().get_entry(&session.plan.entry_id) {
+                if let Some(ref vol_policy) = entry.volume {
+                    return Self::convert_volume_policy(vol_policy);
+                }
+            }
+        }
+        
+        // Fall back to global policy
+        Self::convert_volume_policy(&eng.policy().volume)
+    }
+
+    fn convert_volume_policy(policy: &VolumePolicy) -> VolumeRestrictions {
+        VolumeRestrictions {
+            max_volume: policy.max_volume,
+            min_volume: policy.min_volume,
+            allow_mute: policy.allow_mute,
+            allow_change: policy.allow_change,
         }
     }
 }

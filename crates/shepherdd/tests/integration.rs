@@ -48,12 +48,14 @@ fn make_test_policy() -> Policy {
                         message_template: Some("2 seconds left!".into()),
                     },
                 ],
+                volume: None,
                 disabled: false,
                 disabled_reason: None,
             },
         ],
         default_warnings: vec![],
         default_max_run: Some(Duration::from_secs(3600)),
+        volume: Default::default(),
     }
 }
 

@@ -1,131 +1,181 @@
 //! Volume monitoring and control module
 //!
-//! Monitors and controls system volume via PulseAudio/PipeWire.
-//! Uses the `pactl` command-line tool for simplicity.
+//! Provides volume status and control via the shepherdd daemon.
+//! The daemon handles actual volume control and enforces restrictions.
 
-use std::process::Command;
+use shepherd_api::{Command, ResponsePayload, VolumeInfo};
+use shepherd_ipc::IpcClient;
+use std::path::PathBuf;
+use tokio::runtime::Runtime;
 
-/// Volume status
-#[derive(Debug, Clone, Default)]
-pub struct VolumeStatus {
-    /// Volume percentage (0-100+)
-    pub percent: u8,
-    /// Whether audio is muted
-    pub muted: bool,
+/// Get the default socket path from environment or fallback
+fn get_socket_path() -> PathBuf {
+    std::env::var("SHEPHERD_SOCKET")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from("./dev-runtime/shepherd.sock"))
 }
 
-impl VolumeStatus {
-    /// Read volume status using pactl
-    pub fn read() -> Self {
-        let mut status = VolumeStatus::default();
+/// Get current volume status from the daemon
+pub fn get_volume_status() -> Option<VolumeInfo> {
+    let socket_path = get_socket_path();
 
-        // Get default sink info
-        if let Ok(output) = Command::new("pactl")
-            .args(["get-sink-volume", "@DEFAULT_SINK@"])
-            .output()
-        {
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                // Output looks like: "Volume: front-left: 65536 / 100% / -0.00 dB, front-right: ..."
-                if let Some(percent_str) = stdout.split('/').nth(1) {
-                    if let Ok(percent) = percent_str.trim().trim_end_matches('%').parse::<u8>() {
-                        status.percent = percent;
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => {
+            tracing::error!("Failed to create runtime: {}", e);
+            return None;
+        }
+    };
+
+    rt.block_on(async {
+        match IpcClient::connect(&socket_path).await {
+            Ok(mut client) => match client.send(Command::GetVolume).await {
+                Ok(response) => {
+                    if let shepherd_api::ResponseResult::Ok(ResponsePayload::Volume(info)) =
+                        response.result
+                    {
+                        Some(info)
+                    } else {
+                        None
                     }
                 }
+                Err(e) => {
+                    tracing::error!("Failed to get volume: {}", e);
+                    None
+                }
+            },
+            Err(e) => {
+                tracing::debug!("Failed to connect to daemon for volume: {}", e);
+                None
             }
         }
+    })
+}
 
-        // Check mute status
-        if let Ok(output) = Command::new("pactl")
-            .args(["get-sink-mute", "@DEFAULT_SINK@"])
-            .output()
-        {
-            if let Ok(stdout) = String::from_utf8(output.stdout) {
-                // Output looks like: "Mute: yes" or "Mute: no"
-                status.muted = stdout.contains("yes");
+/// Toggle mute state via the daemon
+pub fn toggle_mute() -> anyhow::Result<()> {
+    let socket_path = get_socket_path();
+
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let mut client = IpcClient::connect(&socket_path).await?;
+        let response = client.send(Command::ToggleMute).await?;
+
+        match response.result {
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
+                Err(anyhow::anyhow!("Volume denied: {}", reason))
             }
+            shepherd_api::ResponseResult::Err(e) => {
+                Err(anyhow::anyhow!("Error: {}", e.message))
+            }
+            _ => Err(anyhow::anyhow!("Unexpected response")),
         }
+    })
+}
 
-        status
-    }
+/// Increase volume by a step via the daemon
+pub fn volume_up(step: u8) -> anyhow::Result<()> {
+    let socket_path = get_socket_path();
 
-    /// Toggle mute state
-    pub fn toggle_mute() -> anyhow::Result<()> {
-        Command::new("pactl")
-            .args(["set-sink-mute", "@DEFAULT_SINK@", "toggle"])
-            .status()?;
-        Ok(())
-    }
+    let rt = Runtime::new()?;
 
-    /// Increase volume by a step
-    pub fn volume_up(step: u8) -> anyhow::Result<()> {
-        Command::new("pactl")
-            .args([
-                "set-sink-volume",
-                "@DEFAULT_SINK@",
-                &format!("+{}%", step),
-            ])
-            .status()?;
-        Ok(())
-    }
+    rt.block_on(async {
+        let mut client = IpcClient::connect(&socket_path).await?;
+        let response = client.send(Command::VolumeUp { step }).await?;
 
-    /// Decrease volume by a step
-    pub fn volume_down(step: u8) -> anyhow::Result<()> {
-        Command::new("pactl")
-            .args([
-                "set-sink-volume",
-                "@DEFAULT_SINK@",
-                &format!("-{}%", step),
-            ])
-            .status()?;
-        Ok(())
-    }
-
-    /// Set volume to a specific percentage
-    pub fn set_volume(percent: u8) -> anyhow::Result<()> {
-        Command::new("pactl")
-            .args(["set-sink-volume", "@DEFAULT_SINK@", &format!("{}%", percent)])
-            .status()?;
-        Ok(())
-    }
-
-    /// Get an icon name for the current volume status
-    pub fn icon_name(&self) -> &'static str {
-        if self.muted {
-            "audio-volume-muted-symbolic"
-        } else if self.percent == 0 {
-            "audio-volume-muted-symbolic"
-        } else if self.percent < 33 {
-            "audio-volume-low-symbolic"
-        } else if self.percent < 66 {
-            "audio-volume-medium-symbolic"
-        } else {
-            "audio-volume-high-symbolic"
+        match response.result {
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
+                Err(anyhow::anyhow!("Volume denied: {}", reason))
+            }
+            shepherd_api::ResponseResult::Err(e) => {
+                Err(anyhow::anyhow!("Error: {}", e.message))
+            }
+            _ => Err(anyhow::anyhow!("Unexpected response")),
         }
-    }
+    })
+}
+
+/// Decrease volume by a step via the daemon
+pub fn volume_down(step: u8) -> anyhow::Result<()> {
+    let socket_path = get_socket_path();
+
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let mut client = IpcClient::connect(&socket_path).await?;
+        let response = client.send(Command::VolumeDown { step }).await?;
+
+        match response.result {
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
+                Err(anyhow::anyhow!("Volume denied: {}", reason))
+            }
+            shepherd_api::ResponseResult::Err(e) => {
+                Err(anyhow::anyhow!("Error: {}", e.message))
+            }
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    })
+}
+
+/// Set volume to a specific percentage via the daemon
+pub fn set_volume(percent: u8) -> anyhow::Result<()> {
+    let socket_path = get_socket_path();
+
+    let rt = Runtime::new()?;
+
+    rt.block_on(async {
+        let mut client = IpcClient::connect(&socket_path).await?;
+        let response = client.send(Command::SetVolume { percent }).await?;
+
+        match response.result {
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
+            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
+                Err(anyhow::anyhow!("Volume denied: {}", reason))
+            }
+            shepherd_api::ResponseResult::Err(e) => {
+                Err(anyhow::anyhow!("Error: {}", e.message))
+            }
+            _ => Err(anyhow::anyhow!("Unexpected response")),
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use shepherd_api::VolumeRestrictions;
 
     #[test]
     fn test_volume_icon_names() {
-        let status = VolumeStatus {
+        // Test that VolumeInfo::icon_name works correctly
+        let info = shepherd_api::VolumeInfo {
             percent: 0,
             muted: false,
+            available: true,
+            backend: Some("test".into()),
+            restrictions: VolumeRestrictions::unrestricted(),
         };
-        assert_eq!(status.icon_name(), "audio-volume-muted-symbolic");
+        assert_eq!(info.icon_name(), "audio-volume-muted-symbolic");
 
-        let status = VolumeStatus {
+        let info = shepherd_api::VolumeInfo {
             percent: 50,
             muted: false,
+            available: true,
+            backend: Some("test".into()),
+            restrictions: VolumeRestrictions::unrestricted(),
         };
-        assert_eq!(status.icon_name(), "audio-volume-medium-symbolic");
+        assert_eq!(info.icon_name(), "audio-volume-medium-symbolic");
 
-        let status = VolumeStatus {
+        let info = shepherd_api::VolumeInfo {
             percent: 100,
             muted: true,
+            available: true,
+            backend: Some("test".into()),
+            restrictions: VolumeRestrictions::unrestricted(),
         };
-        assert_eq!(status.icon_name(), "audio-volume-muted-symbolic");
+        assert_eq!(info.icon_name(), "audio-volume-muted-symbolic");
     }
 }

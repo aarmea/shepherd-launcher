@@ -7,8 +7,10 @@ mod capabilities;
 mod handle;
 mod mock;
 mod traits;
+mod volume;
 
 pub use capabilities::*;
 pub use handle::*;
 pub use mock::*;
 pub use traits::*;
+pub use volume::*;

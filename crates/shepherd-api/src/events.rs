@@ -74,6 +74,12 @@ pub enum EventPayload {
         enabled: bool,
     },
 
+    /// Volume status changed
+    VolumeChanged {
+        percent: u8,
+        muted: bool,
+    },
+
     /// Daemon is shutting down
     Shutdown,
 

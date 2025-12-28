@@ -13,6 +13,14 @@ config_version = 1
 # Set to 0 for unlimited (no time limit)
 default_max_run_seconds = 3600
 
+# Global volume restrictions (optional)
+# These apply when no entry-specific restrictions are defined
+[daemon.volume]
+max_volume = 80      # Maximum volume percentage (0-100)
+# min_volume = 20    # Minimum volume percentage (0-100)
+allow_mute = true    # Whether mute toggle is allowed
+allow_change = true  # Whether volume changes are allowed at all
+
 # Default warning thresholds
 [[daemon.default_warnings]]
 seconds_before = 300
@@ -95,6 +103,10 @@ message = "2 minutes remaining - save your game!"
 seconds_before = 30
 severity = "critical"
 message = "30 seconds! Save NOW!"
+
+# Entry-specific volume restrictions (overrides global)
+[entries.volume]
+max_volume = 60  # Limit volume during gaming sessions
 
 # Example: Educational game
 [[entries]]

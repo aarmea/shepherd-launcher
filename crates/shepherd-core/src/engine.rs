@@ -574,11 +574,13 @@ mod tests {
                     cooldown: None,
                 },
                 warnings: vec![],
+                volume: None,
                 disabled: false,
                 disabled_reason: None,
             }],
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
+            volume: Default::default(),
         }
     }
 
@@ -655,12 +657,14 @@ mod tests {
                     severity: WarningSeverity::Warn,
                     message_template: Some("1 minute left".into()),
                 }],
+                volume: None,
                 disabled: false,
                 disabled_reason: None,
             }],
             daemon: Default::default(),
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
+            volume: Default::default(),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());
@@ -714,12 +718,14 @@ mod tests {
                     cooldown: None,
                 },
                 warnings: vec![],
+                volume: None,
                 disabled: false,
                 disabled_reason: None,
             }],
             daemon: Default::default(),
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
+            volume: Default::default(),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());
