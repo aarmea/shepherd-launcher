@@ -358,8 +358,19 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
 
 fn load_css() {
     let css = r#"
+        :root {
+            --hud-bg: rgba(30, 30, 30, 0.95);
+            --text-primary: white;
+            --text-secondary: #d8dee9;
+            --color-info: #88c0d0;
+            --color-warning: #ebcb8b;
+            --color-critical: #ff6b6b;
+            --color-success: #a3be8c;
+            --hover-bg: rgba(255, 255, 255, 0.1);
+        }
+
         .hud-bar {
-            background-color: rgba(30, 30, 30, 0.95);
+            background-color: var(--hud-bg);
             border: none;
             margin: 0;
             padding: 6px 12px;
@@ -368,21 +379,21 @@ fn load_css() {
         .app-name {
             font-weight: bold;
             font-size: 14px;
-            color: white;
+            color: var(--text-primary);
         }
 
         .time-display {
             font-family: monospace;
             font-size: 14px;
-            color: #88c0d0;
+            color: var(--color-info);
         }
 
         .time-display.time-warning {
-            color: #ebcb8b;
+            color: var(--color-warning);
         }
 
         .time-display.time-critical {
-            color: #bf616a;
+            color: var(--color-critical);
             animation: blink 1s infinite;
         }
 
@@ -397,8 +408,12 @@ fn load_css() {
         }
 
         .warning-text {
-            color: #ebcb8b;
+            color: var(--color-warning);
             font-weight: bold;
+        }
+
+        image {
+            color: var(--text-primary);
         }
 
         .indicator-button,
@@ -407,11 +422,12 @@ fn load_css() {
             min-height: 32px;
             padding: 4px;
             border-radius: 4px;
+            color: var(--text-primary);
         }
 
         .indicator-button:hover,
         .control-button:hover {
-            background-color: rgba(255, 255, 255, 0.1);
+            background-color: var(--hover-bg);
         }
 
         .close-button {
@@ -419,7 +435,7 @@ fn load_css() {
             min-height: 32px;
             padding: 4px;
             border-radius: 4px;
-            color: #bf616a;
+            color: var(--color-critical);
         }
 
         .close-button:hover {
@@ -428,7 +444,7 @@ fn load_css() {
 
         .battery-label {
             font-size: 12px;
-            color: #a3be8c;
+            color: var(--text-primary);
         }
     "#;
 
