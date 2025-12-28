@@ -300,6 +300,7 @@ impl LauncherApp {
         // Set up state change handler
         let stack_weak = stack.downgrade();
         let grid_weak = grid.downgrade();
+        let window_weak = window.downgrade();
         let error_label = error_view.1.clone();
         let session_label = session_view.1.clone();
 
@@ -316,12 +317,19 @@ impl LauncherApp {
                 };
 
                 let grid = grid_weak.upgrade();
+                let window = window_weak.upgrade();
 
                 match state {
                     LauncherState::Disconnected => {
+                        if let Some(ref win) = window {
+                            win.set_visible(true);
+                        }
                         stack.set_visible_child_name("disconnected");
                     }
                     LauncherState::Connecting => {
+                        if let Some(ref win) = window {
+                            win.set_visible(true);
+                        }
                         stack.set_visible_child_name("loading");
                     }
                     LauncherState::Idle { entries } => {
@@ -329,9 +337,12 @@ impl LauncherApp {
                             grid.set_entries(entries);
                             grid.set_tiles_sensitive(true);
                         }
+                        if let Some(ref win) = window {
+                            win.set_visible(true);
+                        }
                         stack.set_visible_child_name("grid");
                     }
-                    LauncherState::Launching { entry_id } => {
+                    LauncherState::Launching { entry_id: _ } => {
                         if let Some(grid) = grid {
                             grid.set_tiles_sensitive(false);
                         }
@@ -343,9 +354,15 @@ impl LauncherApp {
                         time_remaining: _,
                     } => {
                         session_label.set_text(&format!("Running: {}", entry_label));
-                        stack.set_visible_child_name("session");
+                        // Hide the launcher window so the application can be seen
+                        if let Some(ref win) = window {
+                            win.set_visible(false);
+                        }
                     }
                     LauncherState::Error { message } => {
+                        if let Some(ref win) = window {
+                            win.set_visible(true);
+                        }
                         error_label.set_text(&message);
                         stack.set_visible_child_name("error");
                     }
