@@ -108,7 +108,7 @@ message = "30 seconds! Save NOW!"
 [entries.volume]
 max_volume = 60  # Limit volume during gaming sessions
 
-# Example: Educational game
+# Example: Educational games
 [[entries]]
 id = "tuxmath"
 label = "Tux Math"
@@ -120,6 +120,23 @@ command = "tuxmath"
 
 [entries.availability]
 always = true
+
+[[entries]]
+id = "gcompris"
+label = "GCompris"
+icon = "gcompris"
+
+[entries.kind]
+type = "snap"
+snap_name = "gcompris"
+
+[entries.availability]
+always = true
+
+[entries.limits]
+max_run_seconds = 0  # Unlimited: sleep/study aid
+daily_quota_seconds = 0  # Unlimited
+cooldown_seconds = 0  # No cooldown
 
 # Example: Steam game
 [[entries]]
