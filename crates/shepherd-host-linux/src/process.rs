@@ -324,8 +324,11 @@ impl ManagedProcess {
 
     /// Send SIGTERM to all processes in this session
     pub fn terminate(&self) -> HostResult<()> {
-        // First try to kill by command name - this catches snap apps and re-parented processes
-        kill_by_command(&self.command_name, Signal::SIGTERM);
+        // For snap apps, we rely on cgroup-based killing in the adapter, not pkill
+        // Using pkill with broad patterns like "snap" would kill unrelated processes
+        if self.snap_name.is_none() {
+            kill_by_command(&self.command_name, Signal::SIGTERM);
+        }
         
         // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32)); // Negative for process group
@@ -356,8 +359,11 @@ impl ManagedProcess {
 
     /// Send SIGKILL to all processes in this session
     pub fn kill(&self) -> HostResult<()> {
-        // First try to kill by command name - this catches snap apps and re-parented processes
-        kill_by_command(&self.command_name, Signal::SIGKILL);
+        // For snap apps, we rely on cgroup-based killing in the adapter, not pkill
+        // Using pkill with broad patterns like "snap" would kill unrelated processes
+        if self.snap_name.is_none() {
+            kill_by_command(&self.command_name, Signal::SIGKILL);
+        }
         
         // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32));

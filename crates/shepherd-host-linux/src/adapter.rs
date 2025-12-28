@@ -119,9 +119,16 @@ impl HostAdapter for LinuxHost {
                 (argv.clone(), env.clone(), cwd.clone(), None)
             }
             EntryKind::Snap { snap_name, command, args, env } => {
-                // For snap apps, the command defaults to the snap name
-                let cmd = command.clone().unwrap_or_else(|| snap_name.clone());
-                let mut argv = vec![cmd];
+                // For snap apps, we need to use 'snap run <snap_name>' to launch them.
+                // The command (if specified) is passed as an argument after the snap name,
+                // followed by any additional args.
+                let mut argv = vec!["snap".to_string(), "run".to_string(), snap_name.clone()];
+                // If a custom command is specified (different from snap_name), add it
+                if let Some(cmd) = command {
+                    if cmd != snap_name {
+                        argv.push(cmd.clone());
+                    }
+                }
                 argv.extend(args.clone());
                 (argv, env.clone(), None, Some(snap_name.clone()))
             }
@@ -150,7 +157,12 @@ impl HostAdapter for LinuxHost {
         };
 
         // Get the command name for fallback killing
-        let command_name = argv.first().cloned().unwrap_or_default();
+        // For snap apps, use the snap_name (not "snap") to avoid killing unrelated processes
+        let command_name = if let Some(ref snap) = snap_name {
+            snap.clone()
+        } else {
+            argv.first().cloned().unwrap_or_default()
+        };
         
         let proc = ManagedProcess::spawn(
             &argv,
