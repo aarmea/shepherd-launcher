@@ -95,6 +95,12 @@ fn build_hud_window(
     window.set_layer(Layer::Overlay);
     window.set_namespace("shepherd-hud");
 
+    // Remove all margins from the layer-shell surface
+    window.set_margin(Edge::Top, 0);
+    window.set_margin(Edge::Bottom, 0);
+    window.set_margin(Edge::Left, 0);
+    window.set_margin(Edge::Right, 0);
+
     // Set anchors based on position
     match anchor {
         "bottom" => {
@@ -127,10 +133,6 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     let container = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
         .spacing(16)
-        .margin_start(12)
-        .margin_end(12)
-        .margin_top(6)
-        .margin_bottom(6)
         .hexpand(true)
         .build();
 
@@ -358,7 +360,9 @@ fn load_css() {
     let css = r#"
         .hud-bar {
             background-color: rgba(30, 30, 30, 0.95);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            border: none;
+            margin: 0;
+            padding: 6px 12px;
         }
 
         .app-name {
