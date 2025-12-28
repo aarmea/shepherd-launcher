@@ -55,11 +55,11 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
 
     // Validate kind
     match &entry.kind {
-        RawEntryKind::Process { argv, .. } => {
-            if argv.is_empty() {
+        RawEntryKind::Process { command, .. } => {
+            if command.is_empty() {
                 errors.push(ValidationError::EntryError {
                     entry_id: entry.id.clone(),
-                    message: "argv cannot be empty".into(),
+                    message: "command cannot be empty".into(),
                 });
             }
         }
@@ -252,7 +252,8 @@ mod tests {
                     label: "Game 1".into(),
                     icon: None,
                     kind: RawEntryKind::Process {
-                        argv: vec!["game1".into()],
+                        command: "game1".into(),
+                        args: vec![],
                         env: Default::default(),
                         cwd: None,
                     },
@@ -267,7 +268,8 @@ mod tests {
                     label: "Game 2".into(),
                     icon: None,
                     kind: RawEntryKind::Process {
-                        argv: vec!["game2".into()],
+                        command: "game2".into(),
+                        args: vec![],
                         env: Default::default(),
                         cwd: None,
                     },

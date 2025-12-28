@@ -559,7 +559,8 @@ mod tests {
                 label: "Test Game".into(),
                 icon_ref: None,
                 kind: EntryKind::Process {
-                    argv: vec!["game".into()],
+                    command: "game".into(),
+                    args: vec![],
                     env: HashMap::new(),
                     cwd: None,
                 },
@@ -635,7 +636,8 @@ mod tests {
                 label: "Test".into(),
                 icon_ref: None,
                 kind: EntryKind::Process {
-                    argv: vec!["test".into()],
+                    command: "test".into(),
+                    args: vec![],
                     env: HashMap::new(),
                     cwd: None,
                 },
@@ -697,7 +699,8 @@ mod tests {
                 label: "Test".into(),
                 icon_ref: None,
                 kind: EntryKind::Process {
-                    argv: vec!["test".into()],
+                    command: "test".into(),
+                    args: vec![],
                     env: HashMap::new(),
                     cwd: None,
                 },

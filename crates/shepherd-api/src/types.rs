@@ -23,7 +23,11 @@ pub enum EntryKindTag {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EntryKind {
     Process {
-        argv: Vec<String>,
+        /// Command to run (required)
+        command: String,
+        /// Additional command-line arguments
+        #[serde(default)]
+        args: Vec<String>,
         #[serde(default)]
         env: HashMap<String, String>,
         cwd: Option<PathBuf>,
@@ -252,7 +256,8 @@ mod tests {
     #[test]
     fn entry_kind_serialization() {
         let kind = EntryKind::Process {
-            argv: vec!["scummvm".into(), "-f".into()],
+            command: "scummvm".into(),
+            args: vec!["-f".into()],
             env: HashMap::new(),
             cwd: None,
         };

@@ -22,7 +22,8 @@ fn make_test_policy() -> Policy {
                 label: "Test Game".into(),
                 icon_ref: None,
                 kind: EntryKind::Process {
-                    argv: vec!["sleep".into(), "999".into()],
+                    command: "sleep".into(),
+                    args: vec!["999".into()],
                     env: HashMap::new(),
                     cwd: None,
                 },
@@ -227,7 +228,8 @@ async fn test_mock_host_integration() {
 
     let session_id = SessionId::new();
     let entry = EntryKind::Process {
-        argv: vec!["test".into()],
+        command: "test".into(),
+        args: vec![],
         env: HashMap::new(),
         cwd: None,
     };
@@ -262,7 +264,7 @@ fn test_config_parsing() {
         [[entries]]
         id = "scummvm"
         label = "ScummVM"
-        kind = { type = "process", argv = ["scummvm", "-f"] }
+        kind = { type = "process", command = "scummvm", args = ["-f"] }
 
         [entries.availability]
         [[entries.availability.windows]]

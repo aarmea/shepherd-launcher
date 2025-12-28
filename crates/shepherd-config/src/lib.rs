@@ -75,7 +75,7 @@ mod tests {
             [[entries]]
             id = "test-game"
             label = "Test Game"
-            kind = { type = "process", argv = ["/usr/bin/game"] }
+            kind = { type = "process", command = "/usr/bin/game" }
         "#;
 
         let policy = parse_config(config).unwrap();
@@ -91,7 +91,7 @@ mod tests {
             [[entries]]
             id = "test"
             label = "Test"
-            kind = { type = "process", argv = ["/bin/test"] }
+            kind = { type = "process", command = "/bin/test" }
         "#;
 
         let result = parse_config(config);

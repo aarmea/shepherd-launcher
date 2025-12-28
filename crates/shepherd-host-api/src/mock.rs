@@ -189,7 +189,8 @@ mod tests {
 
         let session_id = SessionId::new();
         let entry = EntryKind::Process {
-            argv: vec!["test".into()],
+            command: "test".into(),
+            args: vec![],
             env: HashMap::new(),
             cwd: None,
         };
@@ -217,7 +218,8 @@ mod tests {
 
         let session_id = SessionId::new();
         let entry = EntryKind::Process {
-            argv: vec!["test".into()],
+            command: "test".into(),
+            args: vec![],
             env: HashMap::new(),
             cwd: None,
         };

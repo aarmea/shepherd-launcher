@@ -41,7 +41,8 @@ icon = "scummvm"
 
 [entries.kind]
 type = "process"
-argv = ["scummvm", "-f"]
+command = "scummvm"
+args = ["-f"]
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -95,7 +96,7 @@ seconds_before = 30
 severity = "critical"
 message = "30 seconds! Save NOW!"
 
-# Example: Educational game - unrestricted
+# Example: Educational game
 [[entries]]
 id = "tuxmath"
 label = "Tux Math"
@@ -103,7 +104,21 @@ icon = "tuxmath"
 
 [entries.kind]
 type = "process"
-argv = ["tuxmath"]
+command = "tuxmath"
+
+[entries.availability]
+always = true
+
+# Example: Steam game
+[[entries]]
+id = "steam-human-resource-machine"
+label = "Human Resource Machine"
+icon = "steam"
+
+[entries.kind]
+type = "snap"
+snap_name = "steam"
+args = ["steam://rungameid/375820"]  # Steam App ID (passed to 'snap run steam')
 
 [entries.availability]
 always = true
@@ -119,7 +134,8 @@ icon = "mpv"
 
 [entries.kind]
 type = "process"
-argv = ["mpv", "https://www.youtube.com/watch?v=jfKfPfyJRdk"]
+command = "mpv"
+args = ["https://www.youtube.com/watch?v=jfKfPfyJRdk"]
 
 [entries.availability]
 always = true
@@ -138,4 +154,4 @@ disabled_reason = "This game is being updated"
 
 [entries.kind]
 type = "process"
-argv = ["/bin/false"]
+command = "/bin/false"

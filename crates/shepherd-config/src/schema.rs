@@ -78,7 +78,11 @@ pub struct RawEntry {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum RawEntryKind {
     Process {
-        argv: Vec<String>,
+        /// Command to run (required)
+        command: String,
+        /// Additional command-line arguments
+        #[serde(default)]
+        args: Vec<String>,
         #[serde(default)]
         env: HashMap<String, String>,
         cwd: Option<PathBuf>,
@@ -189,7 +193,7 @@ mod tests {
             [[entries]]
             id = "scummvm"
             label = "ScummVM"
-            kind = { type = "process", argv = ["scummvm", "-f"] }
+            kind = { type = "process", command = "scummvm", args = ["-f"] }
 
             [entries.limits]
             max_run_seconds = 3600
@@ -208,7 +212,7 @@ mod tests {
             [[entries]]
             id = "game"
             label = "Game"
-            kind = { type = "process", argv = ["/bin/game"] }
+            kind = { type = "process", command = "/bin/game" }
 
             [entries.availability]
             [[entries.availability.windows]]

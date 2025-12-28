@@ -115,8 +115,10 @@ impl HostAdapter for LinuxHost {
     ) -> HostResult<HostSessionHandle> {
         // Extract argv, env, cwd, and snap_name based on entry kind
         let (argv, env, cwd, snap_name) = match entry_kind {
-            EntryKind::Process { argv, env, cwd } => {
-                (argv.clone(), env.clone(), cwd.clone(), None)
+            EntryKind::Process { command, args, env, cwd } => {
+                let mut argv = vec![command.clone()];
+                argv.extend(args.clone());
+                (argv, env.clone(), cwd.clone(), None)
             }
             EntryKind::Snap { snap_name, command, args, env } => {
                 // For snap apps, we need to use 'snap run <snap_name>' to launch them.
@@ -318,7 +320,8 @@ mod tests {
 
         let session_id = SessionId::new();
         let entry = EntryKind::Process {
-            argv: vec!["true".into()],
+            command: "true".into(),
+            args: vec![],
             env: HashMap::new(),
             cwd: None,
         };
@@ -348,7 +351,8 @@ mod tests {
 
         let session_id = SessionId::new();
         let entry = EntryKind::Process {
-            argv: vec!["sleep".into(), "60".into()],
+            command: "sleep".into(),
+            args: vec!["60".into()],
             env: HashMap::new(),
             cwd: None,
         };
