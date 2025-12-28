@@ -75,20 +75,26 @@ impl LauncherTile {
         // Set label
         imp.label.set_text(&entry.label);
 
-        // Set icon
+        // Determine fallback icon based on entry kind
+        let fallback_icon = match entry.kind_tag {
+            shepherd_api::EntryKindTag::Process => "application-x-executable",
+            shepherd_api::EntryKindTag::Snap => "application-x-executable",
+            shepherd_api::EntryKindTag::Vm => "computer",
+            shepherd_api::EntryKindTag::Media => "video-x-generic",
+            shepherd_api::EntryKindTag::Custom => "applications-other",
+        };
+
+        // Set icon, checking if the requested icon exists in the theme
         if let Some(ref icon_ref) = entry.icon_ref {
-            // Try to use the icon reference as an icon name
-            imp.icon.set_icon_name(Some(icon_ref));
+            // Check if the icon exists in the default icon theme
+            let icon_theme = gtk4::IconTheme::for_display(&self.display());
+            if icon_theme.has_icon(icon_ref) {
+                imp.icon.set_icon_name(Some(icon_ref));
+            } else {
+                imp.icon.set_icon_name(Some(fallback_icon));
+            }
         } else {
-            // Default icon based on entry kind
-            let icon_name = match entry.kind_tag {
-                shepherd_api::EntryKindTag::Process => "application-x-executable",
-                shepherd_api::EntryKindTag::Snap => "application-x-executable",
-                shepherd_api::EntryKindTag::Vm => "computer",
-                shepherd_api::EntryKindTag::Media => "video-x-generic",
-                shepherd_api::EntryKindTag::Custom => "applications-other",
-            };
-            imp.icon.set_icon_name(Some(icon_name));
+            imp.icon.set_icon_name(Some(fallback_icon));
         }
 
         // Entry is available if enabled and has no blocking reasons
