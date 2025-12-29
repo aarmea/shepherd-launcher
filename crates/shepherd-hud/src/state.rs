@@ -3,7 +3,7 @@
 //! The HUD subscribes to events from shepherdd and tracks session state.
 
 use chrono::Local;
-use shepherd_api::{Event, EventPayload, SessionEndReason, VolumeInfo, VolumeRestrictions};
+use shepherd_api::{Event, EventPayload, SessionEndReason, VolumeInfo, VolumeRestrictions, WarningSeverity};
 use shepherd_util::{EntryId, SessionId};
 use std::sync::Arc;
 use tokio::sync::watch;
@@ -31,6 +31,10 @@ pub enum SessionState {
         entry_name: String,
         warning_issued_at: std::time::Instant,
         time_remaining_at_warning: u64,
+        /// Optional custom message from configuration
+        message: Option<String>,
+        /// Severity level of the warning
+        severity: WarningSeverity,
     },
 
     /// Session is ending
@@ -210,9 +214,12 @@ impl SharedState {
             EventPayload::WarningIssued {
                 session_id,
                 time_remaining,
+                message,
+                severity,
                 ..
             } => {
                 self.session_tx.send_modify(|state| {
+                    // Handle transition from Active state
                     if let SessionState::Active {
                         session_id: sid,
                         entry_id,
@@ -227,6 +234,28 @@ impl SharedState {
                                 entry_name: entry_name.clone(),
                                 warning_issued_at: std::time::Instant::now(),
                                 time_remaining_at_warning: time_remaining.as_secs(),
+                                message: message.clone(),
+                                severity: *severity,
+                            };
+                        }
+                    }
+                    // Handle update when already in Warning state (subsequent warnings)
+                    else if let SessionState::Warning {
+                        session_id: sid,
+                        entry_id,
+                        entry_name,
+                        ..
+                    } = state
+                    {
+                        if sid == session_id {
+                            *state = SessionState::Warning {
+                                session_id: session_id.clone(),
+                                entry_id: entry_id.clone(),
+                                entry_name: entry_name.clone(),
+                                warning_issued_at: std::time::Instant::now(),
+                                time_remaining_at_warning: time_remaining.as_secs(),
+                                message: message.clone(),
+                                severity: *severity,
                             };
                         }
                     }

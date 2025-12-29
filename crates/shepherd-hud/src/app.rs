@@ -405,6 +405,8 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                 entry_name,
                 warning_issued_at,
                 time_remaining_at_warning,
+                message,
+                severity,
                 ..
             } => {
                 app_label_clone.set_text(entry_name);
@@ -412,10 +414,28 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                 let elapsed = warning_issued_at.elapsed().as_secs();
                 let remaining = time_remaining_at_warning.saturating_sub(elapsed);
                 time_display_clone.set_remaining(Some(remaining));
-                warning_label_clone.set_text(&format!(
-                    "Only {} seconds remaining!",
-                    remaining
-                ));
+                // Use configuration-defined message if present, otherwise show time-based message
+                let warning_text = message.clone().unwrap_or_else(|| {
+                    format!("Only {} seconds remaining!", remaining)
+                });
+                warning_label_clone.set_text(&warning_text);
+                
+                // Apply severity-based CSS classes
+                warning_box_clone.remove_css_class("warning-info");
+                warning_box_clone.remove_css_class("warning-warn");
+                warning_box_clone.remove_css_class("warning-critical");
+                match severity {
+                    shepherd_api::WarningSeverity::Info => {
+                        warning_box_clone.add_css_class("warning-info");
+                    }
+                    shepherd_api::WarningSeverity::Warn => {
+                        warning_box_clone.add_css_class("warning-warn");
+                    }
+                    shepherd_api::WarningSeverity::Critical => {
+                        warning_box_clone.add_css_class("warning-critical");
+                    }
+                }
+                
                 warning_box_clone.set_visible(true);
             }
             SessionState::Ending { reason, .. } => {
@@ -515,6 +535,31 @@ fn load_css() {
             background-color: rgba(235, 203, 139, 0.2);
             border-radius: 4px;
             padding: 4px 12px;
+        }
+
+        .warning-banner.warning-info {
+            background-color: rgba(136, 192, 208, 0.2);
+        }
+
+        .warning-banner.warning-info .warning-text {
+            color: var(--color-info);
+        }
+
+        .warning-banner.warning-warn {
+            background-color: rgba(235, 203, 139, 0.2);
+        }
+
+        .warning-banner.warning-warn .warning-text {
+            color: var(--color-warning);
+        }
+
+        .warning-banner.warning-critical {
+            background-color: rgba(255, 107, 107, 0.2);
+            animation: blink 1s infinite;
+        }
+
+        .warning-banner.warning-critical .warning-text {
+            color: var(--color-critical);
         }
 
         .warning-text {
