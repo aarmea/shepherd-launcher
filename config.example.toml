@@ -41,16 +41,73 @@ message = "10 seconds remaining!"
 # Entries
 # -----------------------------------------------------------------------------
 
-# Example: ScummVM - classic adventure games
+## === Native Linux executables ===
+
+# Tux Math - math games
+# Ubuntu: sudo apt install tuxmath
 [[entries]]
-id = "scummvm"
-label = "ScummVM"
+id = "tuxmath"
+label = "Tux Math"
+icon = "tuxmath"
+
+[entries.kind]
+type = "process"
+command = "tuxmath"
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+# Putt Putt Joins the Circus via ScummVM
+# This requires ScummVM to be installed (Ubuntu: `sudo apt install scummvm`).
+# You must install the game files from your copy of the game into ScummVM first.
+# See https://docs.scummvm.org/en/v2.9.1/use_scummvm/game_files.html for how to do this.
+# If you do not have the game files, you can run via Steam instead (see below).
+# https://store.steampowered.com/app/294690/PuttPutt_Joins_the_Circus/
+[[entries]]
+id = "scummvm-putt-putt"
+label = "Putt Putt Joins the Circus"
 icon = "scummvm"
 
 [entries.kind]
 type = "process"
 command = "scummvm"
-args = ["-f"]
+args = ["puttcircus-win-us"]  # ScummVM game ID for Putt Putt Joins the Circus
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+# Secret of Monkey Island via ScummVM
+# Like above, but with the following caveats:
+# * I have only tested this with the original CD-ROM version of the game.
+# * The GOG version at https://www.gog.com/en/game/the_secret_of_monkey_island_special_edition uses a different engine.
+# * It does *not* contain ScummVM-compatible data files, so this entry will not work with that version.
+# * It may be possible to extract compatible files from the GOG installer or run it via WINE, but that is outside the scope of this example.
+# * See https://www.gratissaugen.de/ultimatetalkies/ for how to do this.
+[[entries]]
+id = "scummvm-monkey-island"
+label = "Secret of Monkey Island"
+icon = "scummvm"
+
+[entries.kind]
+type = "process"
+command = "scummvm"
+args = ["monkey"]  # ScummVM game ID for Secret of Monkey Island
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -69,8 +126,38 @@ max_run_seconds = 3600  # 1 hour max (0 = unlimited)
 daily_quota_seconds = 7200  # 2 hours per day (0 = unlimited)
 cooldown_seconds = 300  # 5 minute cooldown after each session
 
-# Example: Minecraft (via snap mc-installer)
-# Uses the special "snap" entry type for proper process management
+## === Snap-based applications ===
+# Snap entries use the "snap" type for proper process management.
+
+# GCompris - educational games suite
+# Ubuntu: sudo snap install gcompris
+[[entries]]
+id = "gcompris"
+label = "GCompris"
+icon = "gcompris"
+
+[entries.kind]
+type = "snap"
+snap_name = "gcompris"
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+[entries.limits]
+max_run_seconds = 0  # Unlimited
+daily_quota_seconds = 0  # Unlimited
+cooldown_seconds = 0  # No cooldown
+
+# Minecraft via mc-installer snap
+# Ubuntu: sudo snap install mc-installer
 [[entries]]
 id = "minecraft"
 label = "Minecraft"
@@ -79,10 +166,17 @@ icon = "minecraft"
 [entries.kind]
 type = "snap"
 snap_name = "mc-installer"
-# command = "mc-installer"  # Optional: defaults to snap_name
 
 [entries.availability]
-always = true  # No time restrictions
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
 
 [entries.limits]
 max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
@@ -108,37 +202,15 @@ message = "30 seconds! Save NOW!"
 [entries.volume]
 max_volume = 60  # Limit volume during gaming sessions
 
-# Example: Educational games
-[[entries]]
-id = "tuxmath"
-label = "Tux Math"
-icon = "tuxmath"
+## === Steam games ===
+# Steam can be used via Canonical's Steam snap package:
+# https://snapcraft.io/steam
+# Install it with: sudo snap install steam
+# Steam must be set up and logged in before using these entries.
+# You must have the games installed in your Steam library.
 
-[entries.kind]
-type = "process"
-command = "tuxmath"
-
-[entries.availability]
-always = true
-
-[[entries]]
-id = "gcompris"
-label = "GCompris"
-icon = "gcompris"
-
-[entries.kind]
-type = "snap"
-snap_name = "gcompris"
-
-[entries.availability]
-always = true
-
-[entries.limits]
-max_run_seconds = 0  # Unlimited: sleep/study aid
-daily_quota_seconds = 0  # Unlimited
-cooldown_seconds = 0  # No cooldown
-
-# Example: Steam game
+# Human Resource Machine
+# https://store.steampowered.com/app/375820/Human_Resource_Machine
 [[entries]]
 id = "steam-human-resource-machine"
 label = "Human Resource Machine"
@@ -150,12 +222,24 @@ snap_name = "steam"
 args = ["steam://rungameid/375820"]  # Steam App ID (passed to 'snap run steam')
 
 [entries.availability]
-always = true
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
 
 # No [entries.limits] section - uses daemon defaults
 # Omitting limits entirely uses default_max_run_seconds
 
-# Example: YouTube video via mpv
+## === Media ===
+# Just use `mpv` to play media.
+# Files can be local on your system or URLs (YouTube, etc).
+
+# "lofi hip hop radio 📚 beats to relax/study to" streamed live from YouTube
 [[entries]]
 id = "lofi-beats"
 label = "Lofi Beats"
