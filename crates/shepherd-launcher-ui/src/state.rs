@@ -73,7 +73,7 @@ impl SharedState {
                 deadline,
             } => {
                 tracing::info!(session_id = %session_id, label = %label, "Session started event");
-                let now = chrono::Local::now();
+                let now = shepherd_util::now();
                 // For unlimited sessions (deadline=None), time_remaining is None
                 let time_remaining = deadline.and_then(|d| {
                     if d > now {
@@ -123,7 +123,7 @@ impl SharedState {
 
     fn apply_snapshot(&self, snapshot: DaemonStateSnapshot) {
         if let Some(session) = snapshot.current_session {
-            let now = chrono::Local::now();
+            let now = shepherd_util::now();
             // For unlimited sessions (deadline=None), time_remaining is None
             let time_remaining = session.deadline.and_then(|d| {
                 if d > now {

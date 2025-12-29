@@ -2,13 +2,12 @@
 //!
 //! These tests verify the end-to-end behavior of the daemon.
 
-use chrono::Local;
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy, Policy};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision};
 use shepherd_host_api::{HostCapabilities, MockHost};
 use shepherd_store::{SqliteStore, Store};
-use shepherd_util::{EntryId, MonotonicInstant};
+use shepherd_util::{self, EntryId, MonotonicInstant};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -73,7 +72,7 @@ fn test_entry_listing() {
     let caps = HostCapabilities::minimal();
     let engine = CoreEngine::new(policy, store, caps);
 
-    let entries = engine.list_entries(Local::now());
+    let entries = engine.list_entries(shepherd_util::now());
 
     assert_eq!(entries.len(), 1);
     assert!(entries[0].enabled);
@@ -89,7 +88,7 @@ fn test_launch_approval() {
     let engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let decision = engine.request_launch(&entry_id, Local::now());
+    let decision = engine.request_launch(&entry_id, shepherd_util::now());
 
     assert!(matches!(decision, LaunchDecision::Approved(plan) if plan.max_duration == Some(Duration::from_secs(10))));
 }
@@ -102,7 +101,7 @@ fn test_session_lifecycle() {
     let mut engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let now = Local::now();
+    let now = shepherd_util::now();
     let now_mono = MonotonicInstant::now();
 
     // Launch
@@ -131,7 +130,7 @@ fn test_warning_emission() {
     let mut engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let now = Local::now();
+    let now = shepherd_util::now();
     let now_mono = MonotonicInstant::now();
 
     // Start session
@@ -170,7 +169,7 @@ fn test_session_expiry() {
     let mut engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let now = Local::now();
+    let now = shepherd_util::now();
     let now_mono = MonotonicInstant::now();
 
     // Start session
@@ -198,7 +197,7 @@ fn test_usage_accounting() {
     let mut engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let now = Local::now();
+    let now = shepherd_util::now();
     let now_mono = MonotonicInstant::now();
 
     // Start session
@@ -302,7 +301,7 @@ fn test_session_extension() {
     let mut engine = CoreEngine::new(policy, store, caps);
 
     let entry_id = EntryId::new("test-game");
-    let now = Local::now();
+    let now = shepherd_util::now();
     let now_mono = MonotonicInstant::now();
 
     // Start session

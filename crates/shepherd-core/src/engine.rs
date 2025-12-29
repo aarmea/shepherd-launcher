@@ -479,7 +479,7 @@ impl CoreEngine {
         });
 
         // Build entry views for the snapshot
-        let entries = self.list_entries(Local::now());
+        let entries = self.list_entries(shepherd_util::now());
 
         DaemonStateSnapshot {
             api_version: API_VERSION,

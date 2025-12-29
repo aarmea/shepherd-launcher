@@ -19,7 +19,7 @@ impl Event {
     pub fn new(payload: EventPayload) -> Self {
         Self {
             api_version: API_VERSION,
-            timestamp: Local::now(),
+            timestamp: shepherd_util::now(),
             payload,
         }
     }

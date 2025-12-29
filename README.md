@@ -82,6 +82,8 @@ TODO
 ## Development
 
 TODO: `./run-dev`, options
+* Set the `SHEPHERD_MOCK_TIME` environment variable to mock the time,
+  such as `SHEPHERD_MOCK_TIME="2025-12-25 15:30:00" ./run-dev`
 
 ## Contributing
 

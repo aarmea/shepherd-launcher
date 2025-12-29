@@ -190,7 +190,7 @@ impl LauncherApp {
                                 match payload {
                                     shepherd_api::ResponsePayload::LaunchApproved { session_id, deadline } => {
                                         info!(session_id = %session_id, "Launch approved, setting SessionActive");
-                                        let now = chrono::Local::now();
+                                        let now = shepherd_util::now();
                                         // For unlimited sessions (deadline=None), time_remaining is None
                                         let time_remaining = deadline.and_then(|d| {
                                             if d > now {

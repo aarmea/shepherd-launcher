@@ -179,6 +179,32 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         .halign(gtk4::Align::End)
         .build();
 
+    // Wall clock display (shows mock time indicator in debug builds)
+    let clock_box = gtk4::Box::builder()
+        .orientation(gtk4::Orientation::Horizontal)
+        .spacing(4)
+        .build();
+
+    let clock_icon = gtk4::Image::from_icon_name("preferences-system-time-symbolic");
+    clock_icon.set_pixel_size(20);
+    clock_box.append(&clock_icon);
+
+    let clock_label = gtk4::Label::new(Some("--:--"));
+    clock_label.add_css_class("clock-label");
+    clock_box.append(&clock_label);
+
+    // Add mock indicator if mock time is active (debug builds only)
+    #[cfg(debug_assertions)]
+    {
+        if shepherd_util::is_mock_time_active() {
+            let mock_indicator = gtk4::Label::new(Some("(MOCK)"));
+            mock_indicator.add_css_class("mock-time-indicator");
+            clock_box.append(&mock_indicator);
+        }
+    }
+
+    right_box.append(&clock_box);
+
     // Volume control with slider
     let volume_box = gtk4::Box::builder()
         .orientation(gtk4::Orientation::Horizontal)
@@ -345,8 +371,13 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     let volume_slider_clone = volume_slider.clone();
     let volume_label_clone = volume_label.clone();
     let slider_changing_for_update = slider_changing.clone();
+    let clock_label_clone = clock_label.clone();
 
     glib::timeout_add_local(Duration::from_millis(500), move || {
+        // Update wall clock display
+        let current_time = shepherd_util::now();
+        clock_label_clone.set_text(&shepherd_util::format_clock_time(&current_time));
+
         // Update session state
         let session_state = state.session_state();
         match &session_state {
@@ -566,6 +597,19 @@ fn load_css() {
             color: var(--text-secondary);
             min-width: 3em;
             text-align: right;
+        }
+
+        .clock-label {
+            font-family: monospace;
+            font-size: 14px;
+            color: var(--text-primary);
+        }
+
+        .mock-time-indicator {
+            font-size: 10px;
+            font-weight: bold;
+            color: var(--color-warning);
+            margin-left: 4px;
         }
     "#;
 

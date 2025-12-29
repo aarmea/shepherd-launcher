@@ -86,7 +86,7 @@ impl AuditEvent {
     pub fn new(event: AuditEventType) -> Self {
         Self {
             id: 0, // Will be set by store
-            timestamp: Local::now(),
+            timestamp: shepherd_util::now(),
             event,
         }
     }

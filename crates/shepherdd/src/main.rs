@@ -10,7 +10,6 @@
 //! - Volume control
 
 use anyhow::{Context, Result};
-use chrono::Local;
 use clap::Parser;
 use shepherd_api::{
     Command, DaemonStateSnapshot, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
@@ -176,7 +175,7 @@ impl Daemon {
                 // Tick timer - check warnings and expiry
                 _ = tick_timer.tick() => {
                     let now_mono = MonotonicInstant::now();
-                    let now = Local::now();
+                    let now = shepherd_util::now();
 
                     let events = {
                         let mut engine = engine.lock().await;
@@ -207,7 +206,7 @@ impl Daemon {
         ipc: &Arc<IpcServer>,
         event: CoreEvent,
         _now_mono: MonotonicInstant,
-        _now: chrono::DateTime<Local>,
+        _now: chrono::DateTime<chrono::Local>,
     ) {
         match &event {
             CoreEvent::Warning {
@@ -322,7 +321,7 @@ impl Daemon {
         match event {
             HostEvent::Exited { handle, status } => {
                 let now_mono = MonotonicInstant::now();
-                let now = Local::now();
+                let now = shepherd_util::now();
 
                 info!(
                     session_id = %handle.session_id,
@@ -454,7 +453,7 @@ impl Daemon {
         request_id: u64,
         command: Command,
     ) -> Response {
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         match command {

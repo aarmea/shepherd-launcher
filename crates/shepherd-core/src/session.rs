@@ -213,7 +213,7 @@ mod tests {
     #[test]
     fn test_session_creation() {
         let plan = make_test_plan(300);
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         let session = ActiveSession::new(plan, now, now_mono);
@@ -261,7 +261,7 @@ mod tests {
     #[test]
     fn test_pending_warnings() {
         let plan = make_test_plan(300);
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         let mut session = ActiveSession::new(plan, now, now_mono);
