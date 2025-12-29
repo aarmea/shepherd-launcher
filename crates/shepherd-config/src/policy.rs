@@ -1,10 +1,9 @@
 //! Validated policy structures
 
-use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
+use crate::schema::{RawConfig, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 

@@ -75,52 +75,6 @@ pub fn toggle_mute() -> anyhow::Result<()> {
     })
 }
 
-/// Increase volume by a step via shepherdd
-pub fn volume_up(step: u8) -> anyhow::Result<()> {
-    let socket_path = get_socket_path();
-
-    let rt = Runtime::new()?;
-
-    rt.block_on(async {
-        let mut client = IpcClient::connect(&socket_path).await?;
-        let response = client.send(Command::VolumeUp { step }).await?;
-
-        match response.result {
-            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
-            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
-                Err(anyhow::anyhow!("Volume denied: {}", reason))
-            }
-            shepherd_api::ResponseResult::Err(e) => {
-                Err(anyhow::anyhow!("Error: {}", e.message))
-            }
-            _ => Err(anyhow::anyhow!("Unexpected response")),
-        }
-    })
-}
-
-/// Decrease volume by a step via shepherdd
-pub fn volume_down(step: u8) -> anyhow::Result<()> {
-    let socket_path = get_socket_path();
-
-    let rt = Runtime::new()?;
-
-    rt.block_on(async {
-        let mut client = IpcClient::connect(&socket_path).await?;
-        let response = client.send(Command::VolumeDown { step }).await?;
-
-        match response.result {
-            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeSet) => Ok(()),
-            shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
-                Err(anyhow::anyhow!("Volume denied: {}", reason))
-            }
-            shepherd_api::ResponseResult::Err(e) => {
-                Err(anyhow::anyhow!("Error: {}", e.message))
-            }
-            _ => Err(anyhow::anyhow!("Unexpected response")),
-        }
-    })
-}
-
 /// Set volume to a specific percentage via shepherdd
 pub fn set_volume(percent: u8) -> anyhow::Result<()> {
     let socket_path = get_socket_path();

@@ -158,7 +158,7 @@ impl IpcServer {
         let client_id_clone = client_id.clone();
 
         // Spawn reader task
-        let reader_handle = tokio::spawn(async move {
+        let _reader_handle = tokio::spawn(async move {
             let mut reader = BufReader::new(read_half);
             let mut line = String::new();
 
@@ -235,8 +235,8 @@ impl IpcServer {
                             clients.get(&client_id_writer).map(|h| h.subscribed).unwrap_or(false)
                         };
 
-                        if is_subscribed {
-                            if let Ok(json) = serde_json::to_string(&event) {
+                        if is_subscribed
+                            && let Ok(json) = serde_json::to_string(&event) {
                                 let mut msg = json;
                                 msg.push('\n');
                                 if let Err(e) = writer.write_all(msg.as_bytes()).await {
@@ -244,7 +244,6 @@ impl IpcServer {
                                     break;
                                 }
                             }
-                        }
                     }
                 }
             }

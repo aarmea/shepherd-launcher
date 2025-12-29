@@ -2,35 +2,34 @@
 
 use shepherd_api::{ServiceStateSnapshot, EntryView, Event, EventPayload};
 use shepherd_util::SessionId;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
 
 /// Current state of the launcher UI
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum LauncherState {
     /// Not connected to shepherdd
+    #[default]
     Disconnected,
     /// Connected, waiting for initial state
     Connecting,
     /// Connected, no session running - show grid
     Idle { entries: Vec<EntryView> },
     /// Launch requested, waiting for response
-    Launching { entry_id: String },
+    Launching {
+        #[allow(dead_code)]
+        entry_id: String
+    },
     /// Session is running
     SessionActive {
+        #[allow(dead_code)]
         session_id: SessionId,
         entry_label: String,
+        #[allow(dead_code)]
         time_remaining: Option<Duration>,
     },
     /// Error state
     Error { message: String },
-}
-
-impl Default for LauncherState {
-    fn default() -> Self {
-        Self::Disconnected
-    }
 }
 
 /// Shared state container

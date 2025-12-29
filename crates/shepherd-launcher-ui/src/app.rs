@@ -2,15 +2,13 @@
 
 use gtk4::glib;
 use gtk4::prelude::*;
-use std::cell::RefCell;
 use std::path::PathBuf;
-use std::rc::Rc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use crate::client::{ClientCommand, CommandClient, ServiceClient};
+use crate::client::{CommandClient, ServiceClient};
 use crate::grid::LauncherGrid;
 use crate::state::{LauncherState, SharedState};
 
@@ -166,7 +164,7 @@ impl LauncherApp {
         let runtime = Arc::new(Runtime::new().expect("Failed to create tokio runtime"));
 
         // Create command channel
-        let (command_tx, command_rx) = mpsc::unbounded_channel();
+        let (_command_tx, command_rx) = mpsc::unbounded_channel();
 
         // Create command client for sending commands
         let command_client = Arc::new(CommandClient::new(&socket_path));

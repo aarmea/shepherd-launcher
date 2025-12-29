@@ -135,12 +135,6 @@ pub enum Command {
     /// Set volume to a specific percentage
     SetVolume { percent: u8 },
 
-    /// Increase volume by a step
-    VolumeUp { step: u8 },
-
-    /// Decrease volume by a step
-    VolumeDown { step: u8 },
-
     /// Toggle mute state
     ToggleMute,
 

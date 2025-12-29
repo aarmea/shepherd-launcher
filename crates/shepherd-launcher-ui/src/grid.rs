@@ -13,10 +13,12 @@ use crate::tile::LauncherTile;
 mod imp {
     use super::*;
 
+    type LaunchCallback = Rc<RefCell<Option<Box<dyn Fn(EntryId) + 'static>>>>;
+
     pub struct LauncherGrid {
         pub flow_box: gtk4::FlowBox,
         pub tiles: RefCell<Vec<LauncherTile>>,
-        pub on_launch: Rc<RefCell<Option<Box<dyn Fn(EntryId) + 'static>>>>,
+        pub on_launch: LaunchCallback,
     }
 
     impl Default for LauncherGrid {
@@ -114,11 +116,10 @@ impl LauncherGrid {
             // Connect click handler
             let on_launch = imp.on_launch.clone();
             tile.connect_clicked(move |tile| {
-                if let Some(entry_id) = tile.entry_id() {
-                    if let Some(callback) = on_launch.borrow().as_ref() {
+                if let Some(entry_id) = tile.entry_id()
+                    && let Some(callback) = on_launch.borrow().as_ref() {
                         callback(entry_id);
                     }
-                }
             });
 
             imp.flow_box.insert(&tile, -1);

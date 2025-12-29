@@ -147,11 +147,10 @@ impl LinuxVolumeController {
             debug!("pactl get-sink-volume output: {}", stdout.trim());
 
             // Output: "Volume: front-left: 65536 / 100% / -0.00 dB, front-right: ..."
-            if let Some(percent_str) = stdout.split('/').nth(1) {
-                if let Ok(percent) = percent_str.trim().trim_end_matches('%').parse::<u8>() {
+            if let Some(percent_str) = stdout.split('/').nth(1)
+                && let Ok(percent) = percent_str.trim().trim_end_matches('%').parse::<u8>() {
                     status.percent = percent;
                 }
-            }
         }
 
         // Check mute status
@@ -184,13 +183,11 @@ impl LinuxVolumeController {
         for line in stdout.lines() {
             if line.contains("Playback") && line.contains('%') {
                 // Extract percentage: [100%]
-                if let Some(start) = line.find('[') {
-                    if let Some(end) = line[start..].find('%') {
-                        if let Ok(percent) = line[start + 1..start + end].parse::<u8>() {
-                            status.percent = percent;
-                        }
+                if let Some(start) = line.find('[')
+                    && let Some(end) = line[start..].find('%')
+                    && let Ok(percent) = line[start + 1..start + end].parse::<u8>() {
+                        status.percent = percent;
                     }
-                }
                 // Check mute status: [on] or [off]
                 status.muted = line.contains("[off]");
                 break;

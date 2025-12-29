@@ -126,11 +126,10 @@ impl HostAdapter for LinuxHost {
                 // followed by any additional args.
                 let mut argv = vec!["snap".to_string(), "run".to_string(), snap_name.clone()];
                 // If a custom command is specified (different from snap_name), add it
-                if let Some(cmd) = command {
-                    if cmd != snap_name {
+                if let Some(cmd) = command
+                    && cmd != snap_name {
                         argv.push(cmd.clone());
                     }
-                }
                 argv.extend(args.clone());
                 (argv, env.clone(), None, Some(snap_name.clone()))
             }
@@ -336,8 +335,8 @@ mod tests {
 
         // Process should have exited
         match handle.payload() {
-            HostHandlePayload::Linux { pid, .. } => {
-                let procs = host.processes.lock().unwrap();
+            HostHandlePayload::Linux { pid: _, .. } => {
+                let _procs = host.processes.lock().unwrap();
                 // Process may or may not still be tracked depending on monitor timing
             }
             _ => panic!("Expected Linux handle"),

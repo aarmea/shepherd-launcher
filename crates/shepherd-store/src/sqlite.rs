@@ -1,6 +1,6 @@
 //! SQLite-based store implementation
 
-use chrono::{DateTime, Local, NaiveDate, TimeZone};
+use chrono::{DateTime, Local, NaiveDate};
 use rusqlite::{params, Connection, OptionalExtension};
 use shepherd_util::EntryId;
 use std::path::Path;
@@ -8,7 +8,7 @@ use std::sync::Mutex;
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use crate::{AuditEvent, SessionSnapshot, StateSnapshot, Store, StoreError, StoreResult};
+use crate::{AuditEvent, StateSnapshot, Store, StoreResult};
 
 /// SQLite-based store
 pub struct SqliteStore {

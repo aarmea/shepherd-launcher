@@ -11,7 +11,6 @@ mod volume;
 
 use anyhow::Result;
 use clap::Parser;
-use gtk4::prelude::*;
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 

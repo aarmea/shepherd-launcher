@@ -2,8 +2,7 @@
 //!
 //! The HUD subscribes to events from shepherdd and tracks session state.
 
-use chrono::Local;
-use shepherd_api::{Event, EventPayload, SessionEndReason, VolumeInfo, VolumeRestrictions, WarningSeverity};
+use shepherd_api::{Event, EventPayload, VolumeInfo, VolumeRestrictions, WarningSeverity};
 use shepherd_util::{EntryId, SessionId};
 use std::sync::Arc;
 use tokio::sync::watch;
@@ -21,6 +20,7 @@ pub enum SessionState {
         entry_name: String,
         started_at: std::time::Instant,
         time_limit_secs: Option<u64>,
+        #[allow(dead_code)]
         time_remaining_secs: Option<u64>,
     },
 
@@ -64,19 +64,6 @@ impl SessionState {
     }
 }
 
-/// System metrics for display
-#[derive(Debug, Clone, Default)]
-pub struct SystemMetrics {
-    /// Battery percentage (0-100)
-    pub battery_percent: Option<u8>,
-    /// Whether battery is charging
-    pub battery_charging: bool,
-    /// Volume percentage (0-100)
-    pub volume_percent: Option<u8>,
-    /// Whether volume is muted
-    pub volume_muted: bool,
-}
-
 /// Shared state for the HUD
 #[derive(Clone)]
 pub struct SharedState {
@@ -84,10 +71,6 @@ pub struct SharedState {
     session_tx: Arc<watch::Sender<SessionState>>,
     /// Session state receiver
     session_rx: watch::Receiver<SessionState>,
-    /// System metrics sender
-    metrics_tx: Arc<watch::Sender<SystemMetrics>>,
-    /// System metrics receiver
-    metrics_rx: watch::Receiver<SystemMetrics>,
     /// Volume info sender (updated via events, not polling)
     volume_tx: Arc<watch::Sender<Option<VolumeInfo>>>,
     /// Volume info receiver
@@ -97,14 +80,11 @@ pub struct SharedState {
 impl SharedState {
     pub fn new() -> Self {
         let (session_tx, session_rx) = watch::channel(SessionState::NoSession);
-        let (metrics_tx, metrics_rx) = watch::channel(SystemMetrics::default());
         let (volume_tx, volume_rx) = watch::channel(None);
 
         Self {
             session_tx: Arc::new(session_tx),
             session_rx,
-            metrics_tx: Arc::new(metrics_tx),
-            metrics_rx,
             volume_tx: Arc::new(volume_tx),
             volume_rx,
         }
@@ -116,23 +96,14 @@ impl SharedState {
     }
 
     /// Subscribe to session state changes
+    #[allow(dead_code)]
     pub fn subscribe_session(&self) -> watch::Receiver<SessionState> {
         self.session_rx.clone()
-    }
-
-    /// Subscribe to metrics changes
-    pub fn subscribe_metrics(&self) -> watch::Receiver<SystemMetrics> {
-        self.metrics_rx.clone()
     }
 
     /// Update session state
     pub fn set_session_state(&self, state: SessionState) {
         let _ = self.session_tx.send(state);
-    }
-
-    /// Update system metrics
-    pub fn set_metrics(&self, metrics: SystemMetrics) {
-        let _ = self.metrics_tx.send(metrics);
     }
 
     /// Get current volume info (cached from events)
@@ -165,6 +136,7 @@ impl SharedState {
     }
 
     /// Update time remaining for current session
+    #[allow(dead_code)]
     pub fn update_time_remaining(&self, remaining_secs: u64) {
         self.session_tx.send_modify(|state| {
             if let SessionState::Active {
@@ -246,8 +218,7 @@ impl SharedState {
                         entry_name,
                         ..
                     } = state
-                    {
-                        if sid == session_id {
+                        && sid == session_id {
                             *state = SessionState::Warning {
                                 session_id: session_id.clone(),
                                 entry_id: entry_id.clone(),
@@ -258,7 +229,6 @@ impl SharedState {
                                 severity: *severity,
                             };
                         }
-                    }
                 });
             }
 
@@ -275,11 +245,11 @@ impl SharedState {
                 if let Some(session) = &snapshot.current_session {
                     let now = shepherd_util::now();
                     // For unlimited sessions (deadline=None), time_remaining is None
-                    let time_remaining = session.deadline.and_then(|d| {
+                    let time_remaining = session.deadline.map(|d| {
                         if d > now {
-                            Some((d - now).num_seconds().max(0) as u64)
+                            (d - now).num_seconds().max(0) as u64
                         } else {
-                            Some(0)
+                            0
                         }
                     });
                     self.set_session_state(SessionState::Active {

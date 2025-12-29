@@ -264,7 +264,7 @@ impl ManagedProcess {
         unsafe {
             cmd.pre_exec(|| {
                 nix::unistd::setsid().map_err(|e| {
-                    std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+                    std::io::Error::other(e.to_string())
                 })?;
                 Ok(())
             });
@@ -304,14 +304,12 @@ impl ManagedProcess {
                             if let Some(paren_end) = stat.rfind(')') {
                                 let after_comm = &stat[paren_end + 2..];
                                 let fields: Vec<&str> = after_comm.split_whitespace().collect();
-                                if fields.len() >= 2 {
-                                    if let Ok(ppid) = fields[1].parse::<i32>() {
-                                        if ppid == parent_pid {
-                                            descendants.push(pid);
-                                            to_check.push(pid);
-                                        }
+                                if fields.len() >= 2
+                                    && let Ok(ppid) = fields[1].parse::<i32>()
+                                    && ppid == parent_pid {
+                                        descendants.push(pid);
+                                        to_check.push(pid);
                                     }
-                                }
                             }
                         }
                     }

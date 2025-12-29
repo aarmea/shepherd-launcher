@@ -12,22 +12,21 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use shepherd_api::{
-    Command, ServiceStateSnapshot, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
+    Command, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
     Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
-    API_VERSION,
 };
-use shepherd_config::{load_config, Policy, VolumePolicy};
+use shepherd_config::{load_config, VolumePolicy};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision, StopDecision};
 use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode, VolumeController};
 use shepherd_host_linux::{LinuxHost, LinuxVolumeController};
 use shepherd_ipc::{IpcServer, ServerMessage};
 use shepherd_store::{AuditEvent, AuditEventType, SqliteStore, Store};
-use shepherd_util::{ClientId, EntryId, MonotonicInstant, RateLimiter};
+use shepherd_util::{ClientId, MonotonicInstant, RateLimiter};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
-use tracing::{debug, error, info, warn, Level};
+use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
 /// shepherdd - Policy enforcement service for child-focused computing
@@ -243,8 +242,8 @@ impl Service {
                         .and_then(|s| s.host_handle.clone())
                 };
 
-                if let Some(handle) = handle {
-                    if let Err(e) = host
+                if let Some(handle) = handle
+                    && let Err(e) = host
                         .stop(
                             &handle,
                             HostStopMode::Graceful {
@@ -256,7 +255,6 @@ impl Service {
                         warn!(error = %e, "Failed to stop session gracefully, forcing");
                         let _ = host.stop(&handle, HostStopMode::Force).await;
                     }
-                }
 
                 ipc.broadcast_event(Event::new(EventPayload::SessionExpiring {
                     session_id: session_id.clone(),
@@ -336,13 +334,12 @@ impl Service {
 
                 info!(has_event = core_event.is_some(), "notify_session_exited result");
 
-                if let Some(event) = core_event {
-                    if let CoreEvent::SessionEnded {
-                        session_id,
-                        entry_id,
-                        reason,
-                        duration,
-                    } = event
+                if let Some(CoreEvent::SessionEnded {
+                    session_id,
+                    entry_id,
+                    reason,
+                    duration,
+                }) = core_event
                     {
                         info!(
                             session_id = %session_id,
@@ -366,7 +363,6 @@ impl Service {
                         info!("Broadcasting StateChanged");
                         ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
                     }
-                }
             }
 
             HostEvent::WindowReady { handle } => {
@@ -443,6 +439,7 @@ impl Service {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn handle_command(
         engine: &Arc<Mutex<CoreEngine>>,
         host: &Arc<LinuxHost>,
@@ -530,13 +527,12 @@ impl Service {
                                 Err(e) => {
                                     // Notify session ended with error and broadcast to subscribers
                                     let mut eng = engine.lock().await;
-                                    if let Some(event) = eng.notify_session_exited(Some(-1), now_mono, now) {
-                                        if let CoreEvent::SessionEnded {
-                                            session_id,
-                                            entry_id,
-                                            reason,
-                                            duration,
-                                        } = event
+                                    if let Some(CoreEvent::SessionEnded {
+                                        session_id,
+                                        entry_id,
+                                        reason,
+                                        duration,
+                                    }) = eng.notify_session_exited(Some(-1), now_mono, now)
                                         {
                                             ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
                                                 session_id,
@@ -549,7 +545,6 @@ impl Service {
                                             let state = eng.get_state();
                                             ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
                                         }
-                                    }
 
                                     Response::error(
                                         request_id,
@@ -629,14 +624,13 @@ impl Service {
 
             Command::ReloadConfig => {
                 // Check permission
-                if let Some(info) = ipc.get_client_info(client_id).await {
-                    if !info.role.can_reload_config() {
+                if let Some(info) = ipc.get_client_info(client_id).await
+                    && !info.role.can_reload_config() {
                         return Response::error(
                             request_id,
                             ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
                         );
                     }
-                }
 
                 // TODO: Reload from original config path
                 Response::error(
@@ -672,14 +666,13 @@ impl Service {
 
             Command::ExtendCurrent { by } => {
                 // Check permission
-                if let Some(info) = ipc.get_client_info(client_id).await {
-                    if !info.role.can_extend() {
+                if let Some(info) = ipc.get_client_info(client_id).await
+                    && !info.role.can_extend() {
                         return Response::error(
                             request_id,
                             ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
                         );
                     }
-                }
 
                 let mut eng = engine.lock().await;
                 match eng.extend_current(by, now_mono, now) {
@@ -694,7 +687,7 @@ impl Service {
             }
 
             Command::GetVolume => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+                let restrictions = Self::get_current_volume_restrictions(engine).await;
 
                 match volume.get_status().await {
                     Ok(status) => {
@@ -722,7 +715,7 @@ impl Service {
             }
 
             Command::SetVolume { percent } => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+                let restrictions = Self::get_current_volume_restrictions(engine).await;
 
                 if !restrictions.allow_change {
                     return Response::success(
@@ -755,80 +748,8 @@ impl Service {
                 }
             }
 
-            Command::VolumeUp { step } => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
-
-                if !restrictions.allow_change {
-                    return Response::success(
-                        request_id,
-                        ResponsePayload::VolumeDenied {
-                            reason: "Volume changes are not allowed".into(),
-                        },
-                    );
-                }
-
-                // Get current volume and check if we'd exceed max
-                let current = volume.get_status().await.map(|s| s.percent).unwrap_or(0);
-                let target = current.saturating_add(step);
-                let clamped = restrictions.clamp_volume(target);
-
-                match volume.set_volume(clamped).await {
-                    Ok(()) => {
-                        if let Ok(status) = volume.get_status().await {
-                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
-                                percent: status.percent,
-                                muted: status.muted,
-                            }));
-                        }
-                        Response::success(request_id, ResponsePayload::VolumeSet)
-                    }
-                    Err(e) => Response::success(
-                        request_id,
-                        ResponsePayload::VolumeDenied {
-                            reason: e.to_string(),
-                        },
-                    ),
-                }
-            }
-
-            Command::VolumeDown { step } => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
-
-                if !restrictions.allow_change {
-                    return Response::success(
-                        request_id,
-                        ResponsePayload::VolumeDenied {
-                            reason: "Volume changes are not allowed".into(),
-                        },
-                    );
-                }
-
-                // Get current volume and check if we'd go below min
-                let current = volume.get_status().await.map(|s| s.percent).unwrap_or(0);
-                let target = current.saturating_sub(step);
-                let clamped = restrictions.clamp_volume(target);
-
-                match volume.set_volume(clamped).await {
-                    Ok(()) => {
-                        if let Ok(status) = volume.get_status().await {
-                            ipc.broadcast_event(Event::new(EventPayload::VolumeChanged {
-                                percent: status.percent,
-                                muted: status.muted,
-                            }));
-                        }
-                        Response::success(request_id, ResponsePayload::VolumeSet)
-                    }
-                    Err(e) => Response::success(
-                        request_id,
-                        ResponsePayload::VolumeDenied {
-                            reason: e.to_string(),
-                        },
-                    ),
-                }
-            }
-
             Command::ToggleMute => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+                let restrictions = Self::get_current_volume_restrictions(engine).await;
 
                 if !restrictions.allow_mute {
                     return Response::success(
@@ -859,7 +780,7 @@ impl Service {
             }
 
             Command::SetMute { muted } => {
-                let restrictions = Self::get_current_volume_restrictions(&engine).await;
+                let restrictions = Self::get_current_volume_restrictions(engine).await;
 
                 if !restrictions.allow_mute {
                     return Response::success(
@@ -900,13 +821,11 @@ impl Service {
         let eng = engine.lock().await;
         
         // Check if there's an active session with volume restrictions
-        if let Some(session) = eng.current_session() {
-            if let Some(entry) = eng.policy().get_entry(&session.plan.entry_id) {
-                if let Some(ref vol_policy) = entry.volume {
-                    return Self::convert_volume_policy(vol_policy);
-                }
+        if let Some(session) = eng.current_session()
+            && let Some(entry) = eng.policy().get_entry(&session.plan.entry_id)
+            && let Some(ref vol_policy) = entry.volume {
+                return Self::convert_volume_policy(vol_policy);
             }
-        }
         
         // Fall back to global policy
         Self::convert_volume_policy(&eng.policy().volume)

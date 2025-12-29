@@ -56,9 +56,6 @@ impl HudApp {
                 }
             });
 
-            // Start periodic updates for battery/volume
-            start_metrics_updates(state.clone());
-
             // Subscribe to state changes
             let window_clone = window.clone();
             let state_clone = state.clone();
@@ -726,10 +723,4 @@ fn run_event_loop(socket_path: PathBuf, state: SharedState) -> anyhow::Result<()
             tokio::time::sleep(Duration::from_secs(2)).await;
         }
     })
-}
-
-fn start_metrics_updates(_state: SharedState) {
-    // Battery and volume are now updated in the main UI loop
-    // This function could be used for more expensive operations
-    // that don't need to run as frequently
 }

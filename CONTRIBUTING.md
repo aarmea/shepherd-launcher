@@ -52,12 +52,16 @@ Run the test suite:
 
 ```sh
 cargo test
+# as run in CI:
+cargo test --all-targets
 ```
 
 Run lint checks:
 
 ```sh
 cargo clippy
+# as run in CI:
+cargo clippy --all-targets -- -D warnings
 ```
 
 

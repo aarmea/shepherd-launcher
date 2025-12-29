@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Local};
 use shepherd_api::{
-    ServiceStateSnapshot, EntryKindTag, EntryView, ReasonCode, SessionEndReason,
+    ServiceStateSnapshot, EntryView, ReasonCode, SessionEndReason,
     WarningSeverity, API_VERSION,
 };
 use shepherd_config::{Entry, Policy};
@@ -11,7 +11,7 @@ use shepherd_store::{AuditEvent, AuditEventType, Store};
 use shepherd_util::{EntryId, MonotonicInstant, SessionId};
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::{ActiveSession, CoreEvent, SessionPlan, StopResult};
 
@@ -128,22 +128,20 @@ impl CoreEngine {
         }
 
         // Check cooldown
-        if let Ok(Some(until)) = self.store.get_cooldown_until(&entry.id) {
-            if until > now {
+        if let Ok(Some(until)) = self.store.get_cooldown_until(&entry.id)
+            && until > now {
                 enabled = false;
                 reasons.push(ReasonCode::CooldownActive { available_at: until });
             }
-        }
 
         // Check daily quota
         if let Some(quota) = entry.limits.daily_quota {
             let today = now.date_naive();
-            if let Ok(used) = self.store.get_usage(&entry.id, today) {
-                if used >= quota {
+            if let Ok(used) = self.store.get_usage(&entry.id, today)
+                && used >= quota {
                     enabled = false;
                     reasons.push(ReasonCode::QuotaExhausted { used, quota });
                 }
-            }
         }
 
         // Calculate max run if enabled (None when disabled, Some(None) flattened for unlimited)
@@ -393,12 +391,11 @@ impl CoreEngine {
         let _ = self.store.add_usage(&session.plan.entry_id, today, duration);
 
         // Set cooldown if configured
-        if let Some(entry) = self.policy.get_entry(&session.plan.entry_id) {
-            if let Some(cooldown) = entry.limits.cooldown {
+        if let Some(entry) = self.policy.get_entry(&session.plan.entry_id)
+            && let Some(cooldown) = entry.limits.cooldown {
                 let until = now + chrono::Duration::from_std(cooldown).unwrap();
                 let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
             }
-        }
 
         // Log to audit
         let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionEnded {
@@ -443,12 +440,11 @@ impl CoreEngine {
         let _ = self.store.add_usage(&session.plan.entry_id, today, duration);
 
         // Set cooldown if configured
-        if let Some(entry) = self.policy.get_entry(&session.plan.entry_id) {
-            if let Some(cooldown) = entry.limits.cooldown {
+        if let Some(entry) = self.policy.get_entry(&session.plan.entry_id)
+            && let Some(cooldown) = entry.limits.cooldown {
                 let until = now + chrono::Duration::from_std(cooldown).unwrap();
                 let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
             }
-        }
 
         // Log to audit
         let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionEnded {
@@ -510,8 +506,8 @@ impl CoreEngine {
     pub fn extend_current(
         &mut self,
         by: Duration,
-        now_mono: MonotonicInstant,
-        now: DateTime<Local>,
+        _now_mono: MonotonicInstant,
+        _now: DateTime<Local>,
     ) -> Option<DateTime<Local>> {
         let session = self.current_session.as_mut()?;
 

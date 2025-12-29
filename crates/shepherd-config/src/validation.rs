@@ -113,8 +113,8 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
         .or(config.service.default_max_run_seconds);
 
     // Only validate warnings if max_run is Some and not 0 (unlimited)
-    if let (Some(warnings), Some(max_run)) = (&entry.warnings, max_run) {
-        if max_run > 0 {
+    if let (Some(warnings), Some(max_run)) = (&entry.warnings, max_run)
+        && max_run > 0 {
             for warning in warnings {
                 if warning.seconds_before >= max_run {
                     errors.push(ValidationError::WarningExceedsMaxRun {
@@ -124,7 +124,6 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
                     });
                 }
             }
-        }
         // Note: warnings are ignored for unlimited entries (max_run = 0)
     }
 

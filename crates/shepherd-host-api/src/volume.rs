@@ -37,9 +37,7 @@ pub struct VolumeStatus {
 impl VolumeStatus {
     /// Get an icon name for the current volume status
     pub fn icon_name(&self) -> &'static str {
-        if self.muted {
-            "audio-volume-muted-symbolic"
-        } else if self.percent == 0 {
+        if self.muted || self.percent == 0 {
             "audio-volume-muted-symbolic"
         } else if self.percent < 33 {
             "audio-volume-low-symbolic"

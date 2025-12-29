@@ -1,19 +1,20 @@
 //! IPC client wrapper for the launcher UI
 
 use anyhow::{Context, Result};
-use shepherd_api::{Command, Event, ReasonCode, Response, ResponsePayload, ResponseResult};
+use shepherd_api::{Command, ReasonCode, Response, ResponsePayload, ResponseResult};
 use shepherd_ipc::IpcClient;
 use shepherd_util::EntryId;
 use std::path::Path;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 use crate::state::{LauncherState, SharedState};
 
 /// Messages from UI to client task
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum ClientCommand {
     /// Request to launch an entry
     Launch(EntryId),
@@ -98,7 +99,7 @@ impl ServiceClient {
                             info!("Shutdown requested");
                             return Ok(());
                         }
-                        ClientCommand::Launch(entry_id) => {
+                        ClientCommand::Launch(_entry_id) => {
                             // We can't send commands after subscribing since client is consumed
                             // Need to reconnect for commands
                             warn!("Launch command received but cannot send after subscribe");
@@ -222,6 +223,7 @@ impl CommandClient {
         }).await.map_err(Into::into)
     }
 
+    #[allow(dead_code)]
     pub async fn stop_current(&self) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
         client.send(Command::StopCurrent {
@@ -234,6 +236,7 @@ impl CommandClient {
         client.send(Command::GetState).await.map_err(Into::into)
     }
 
+    #[allow(dead_code)]
     pub async fn list_entries(&self) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
         client.send(Command::ListEntries { at_time: None }).await.map_err(Into::into)
