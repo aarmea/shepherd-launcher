@@ -87,6 +87,11 @@ window {
     font-size: 24px;
     font-weight: 600;
 }
+
+.session-sublabel {
+    color: #888888;
+    font-size: 16px;
+}
 "#;
 
 pub struct LauncherApp {
@@ -356,11 +361,13 @@ impl LauncherApp {
                         entry_label,
                         time_remaining: _,
                     } => {
-                        session_label.set_text(&format!("Running: {}", entry_label));
-                        // Hide the launcher window so the application can be seen
+                        session_label.set_text(&format!("Loading: {}", entry_label));
+                        // Show the session view as a loading screen behind the game
+                        // The game window will appear on top when it launches
                         if let Some(ref win) = window {
-                            win.set_visible(false);
+                            win.set_visible(true);
                         }
+                        stack.set_visible_child_name("session");
                     }
                     LauncherState::Error { message } => {
                         if let Some(ref win) = window {
@@ -417,12 +424,17 @@ impl LauncherApp {
         container.set_valign(gtk4::Align::Center);
         container.add_css_class("session-active-box");
 
-        let label = gtk4::Label::new(Some("Session Active"));
+        let spinner = gtk4::Spinner::new();
+        spinner.set_spinning(true);
+        spinner.add_css_class("launching-spinner");
+        container.append(&spinner);
+
+        let label = gtk4::Label::new(Some("Loading..."));
         label.add_css_class("session-label");
         container.append(&label);
 
-        let hint = gtk4::Label::new(Some("Use the HUD to view time remaining"));
-        hint.add_css_class("status-label");
+        let hint = gtk4::Label::new(Some("Please wait while the application starts"));
+        hint.add_css_class("session-sublabel");
         container.append(&hint);
 
         (container, label)
