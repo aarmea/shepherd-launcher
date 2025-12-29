@@ -10,58 +10,39 @@ not software or hardware vendors, by providing:
 * access to any application that can be run, emulated, or virtualized in desktop Linux
 * with granular access controls inspired by and exceeding those in iOS Screen Time
 
-While this repository provides some recipes for existing software packages
-(including non-free software), `shepherd-launcher` is *non-prescriptive*: as
-the end user, you are free to use them, not use them, or write your own.
+While this repository provides some examples for existing software packages
+(including non-free software and abandonware), `shepherd-launcher` is
+*non-prescriptive*: as the end user, you are free to use them, not use them,
+or write your own.
 
 ## Screenshots
 
-TODO:
+### Home screen
 
-* home screen at different times showing different applications
-* modern proprietary application showcase (Minecraft, individual Steam games)
-* emulated application showcase (ScummVM games, 90s edutainment on Win9x, Duolingo via Waydroid)
-* externally managed Chrome container for access to school resources
-* media showcase (local storage and individual titles from streaming services)
-* time limit popup
-* "token" system
+TODO: home screen at different times (bedtime vs afternoon) showing different applications
 
-## Installation
+### Time limits
 
-tl;dr:
+TODO: GIF or video of GCompris a few seconds from closing, emphasizing:
+* Countdown clock
+* Warning messaging
+* Automatic close at end of time
+* Icon deliberately missing afterwards -- cooldown
 
-1. any Linux with Wayland (optional: TPM-based FDE plus BIOS password to prevent tampering)
-2. System dependencies:
-   - **Ubuntu/Debian**: `apt install build-essential pkg-config libglib2.0-dev libgtk-4-dev libcairo2-dev libpango1.0-dev libgdk-pixbuf-xlib-2.0-dev libwayland-dev libx11-dev libxkbcommon-dev libgirepository1.0-dev libgtk4-layer-shell-dev librust-gtk4-layer-shell-sys-dev sway swayidle`
-3. Rust (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
-4. Set up cgroups for process management (one-time, requires root):
-   ```bash
-   sudo ./setup-cgroups.sh
-   ```
-5. binaries (TODO: deployable package that depends on Sway and installs the config)
-6. test session on login
-7. configure auto-login to this session
+### "access to any application that can be run, emulated, or virtualized"
 
-### cgroups Setup
+TODO: show the following running with some subset of the above features highlighted:
+* Minecraft
+* Steam games (World of Goo, Portal 2)
+* ScummVM games (Putt Putt, Secret of Monkey Island)
+* Media
 
-The shepherd daemon uses Linux cgroups v2 to reliably terminate all processes
-when a session ends. This is essential for applications like Minecraft that
-spawn child processes which may escape traditional process group signals.
-
-Run the setup script once after installation:
-
-```bash
-sudo ./setup-cgroups.sh
-```
-
-This creates `/sys/fs/cgroup/shepherd` with appropriate permissions for your
-user. The directory is not persistent across reboots on most systems, so you
-may want to add this to your system startup (e.g., in `/etc/rc.local` or a
-systemd unit).
-
-## Usage
-
-TODO: open lid; play
+Contributions are welcome for improvements and not yet implemented backends,
+such as:
+* Pre-booted Steam to improve launch time [TODO: link to issue]
+* Android apps via Waydroid, including pre-booting Android if necessary [TODO: link to issue]
+* Legacy Win9x via DOSBox, QEMU, or PCem, including scripts to create a boot-to-app image [TODO: link to issue]
+* Chrome, including strict sandboxing and support for firewall rules [TODO: link to issue]
 
 ## Core concepts
 
@@ -71,32 +52,87 @@ TODO: open lid; play
 * **Wrappers, not patches**: existing software is sandboxed, not modified
 * **Revocable access**: sessions end predictably and enforceably
 
-## Recipes
+## Non-goals
 
-TODO
+* Modifying or patching third-party applications
+* Circumventing DRM or platform protections
+* Replacing parental involvement with automation
 
-* `.desktop` syntax plus rules (time allowance, time-of-day restrictions, network whitelist, etc.)
-* wrappers for common applications
-* how to write a custom wrapper or custom application
+## Installation
+
+`shepherd-launcher` is pre-alpha and in active development. As such, end-user
+binaries and installation instructions are not yet available.
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to run in development.
+
+Contributions are welcome for:
+* a CI step that generates production binaries [TODO: link to issue]
+* an installation script [TODO: link to issue]
+
+## Example configuration
+
+For the Minecraft example shown above:
+
+```toml
+# Minecraft via mc-installer snap
+# Ubuntu: sudo snap install mc-installer
+[[entries]]
+id = "minecraft"
+label = "Minecraft"
+icon = "minecraft"
+
+[entries.kind]
+type = "snap"
+snap_name = "mc-installer"
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+[entries.limits]
+max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
+daily_quota_seconds = 3600  # 1 hour per day
+cooldown_seconds = 600  # 10 minute cooldown
+
+[[entries.warnings]]
+seconds_before = 600
+severity = "info"
+message = "10 minutes left - start wrapping up!"
+
+[[entries.warnings]]
+seconds_before = 120
+severity = "warn"
+message = "2 minutes remaining - save your game!"
+
+[[entries.warnings]]
+seconds_before = 30
+severity = "critical"
+message = "30 seconds! Save NOW!"
+```
+
+See [config.example.toml](./config.example.toml) for more.
 
 ## Development
 
-tl;dr:
-* Run in development: `./run-dev`
-* Set the `SHEPHERD_MOCK_TIME` environment variable to mock the time,
-  such as `SHEPHERD_MOCK_TIME="2025-12-25 15:30:00" ./run-dev`
-* Run tests: `cargo test`
-* Lint: `cargo clippy`
+See [CONTRIBUTING.md](./CONTRIBUTING.md)
 
-## Contributing
+## Written in 2025, responsibly
 
-`shepherd-launcher` is licensed under the GPLv3 to preserve end-users' rights.
-By submitting a pull request, you agree to license your contributions under the
-GPLv3.
+This project stands on the shoulders of giants in systems software and
+compatibility infrastructure:
 
-Contributions written in part or in whole by generative AI are allowed;
-however, they will be reviewed as if you personally authored them.
+* Wayland and Sway
+* Rust
+* Snap
+* Proton and WINE
 
-The authors of `shepherd-launcher` do not condone software or media piracy.
-Contributions that explicitly promote or facilitate piracy will be rejected.
-Please support developers and creators by obtaining content legally.
+This project was written with the assistance of generative AI-based coding
+agents. Substantial prompts and design docs provided to agents are disclosed in
+[docs/ai](./docs/ai/)
