@@ -236,10 +236,11 @@ end = "20:00"
 # Omitting limits entirely uses default_max_run_seconds
 
 ## === Media ===
-# Just use `mpv` to play media.
+# Just use `mpv` to play media (for now).
 # Files can be local on your system or URLs (YouTube, etc).
 
 # "lofi hip hop radio 📚 beats to relax/study to" streamed live from YouTube
+# This should eventually be replaced with the media type.
 [[entries]]
 id = "lofi-beats"
 label = "Lofi Beats"

@@ -39,6 +39,7 @@ TODO: show the following running with some subset of the above features highligh
 
 Contributions are welcome for improvements and not yet implemented backends,
 such as:
+* Content-aware media player [TODO: link to issue]
 * Pre-booted Steam to improve launch time [TODO: link to issue]
 * Android apps via Waydroid, including pre-booting Android if necessary [TODO: link to issue]
 * Legacy Win9x via DOSBox, QEMU, or PCem, including scripts to create a boot-to-app image [TODO: link to issue]
