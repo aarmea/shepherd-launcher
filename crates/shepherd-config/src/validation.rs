@@ -110,7 +110,7 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
         .limits
         .as_ref()
         .and_then(|l| l.max_run_seconds)
-        .or(config.daemon.default_max_run_seconds);
+        .or(config.service.default_max_run_seconds);
 
     // Only validate warnings if max_run is Some and not 0 (unlimited)
     if let (Some(warnings), Some(max_run)) = (&entry.warnings, max_run) {
@@ -245,7 +245,7 @@ mod tests {
     fn test_duplicate_id_detection() {
         let config = RawConfig {
             config_version: 1,
-            daemon: Default::default(),
+            service: Default::default(),
             entries: vec![
                 RawEntry {
                     id: "game".into(),

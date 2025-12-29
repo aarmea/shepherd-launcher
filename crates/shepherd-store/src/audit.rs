@@ -10,11 +10,11 @@ use std::time::Duration;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum AuditEventType {
-    /// Daemon started
-    DaemonStarted,
+    /// Service started
+    ServiceStarted,
 
-    /// Daemon stopped
-    DaemonStopped,
+    /// Service stopped
+    ServiceStopped,
 
     /// Policy loaded/reloaded
     PolicyLoaded { entry_count: usize },

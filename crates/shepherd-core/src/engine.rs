@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Local};
 use shepherd_api::{
-    DaemonStateSnapshot, EntryKindTag, EntryView, ReasonCode, SessionEndReason,
+    ServiceStateSnapshot, EntryKindTag, EntryView, ReasonCode, SessionEndReason,
     WarningSeverity, API_VERSION,
 };
 use shepherd_config::{Entry, Policy};
@@ -472,8 +472,8 @@ impl CoreEngine {
         })
     }
 
-    /// Get current daemon state snapshot
-    pub fn get_state(&self) -> DaemonStateSnapshot {
+    /// Get current service state snapshot
+    pub fn get_state(&self) -> ServiceStateSnapshot {
         let current_session = self.current_session.as_ref().map(|s| {
             s.to_session_info(MonotonicInstant::now())
         });
@@ -481,7 +481,7 @@ impl CoreEngine {
         // Build entry views for the snapshot
         let entries = self.list_entries(shepherd_util::now());
 
-        DaemonStateSnapshot {
+        ServiceStateSnapshot {
             api_version: API_VERSION,
             policy_loaded: true,
             current_session,
@@ -553,7 +553,7 @@ mod tests {
 
     fn make_test_policy() -> Policy {
         Policy {
-            daemon: Default::default(),
+            service: Default::default(),
             entries: vec![Entry {
                 id: EntryId::new("test-game"),
                 label: "Test Game".into(),
@@ -661,7 +661,7 @@ mod tests {
                 disabled: false,
                 disabled_reason: None,
             }],
-            daemon: Default::default(),
+            service: Default::default(),
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
             volume: Default::default(),
@@ -722,7 +722,7 @@ mod tests {
                 disabled: false,
                 disabled_reason: None,
             }],
-            daemon: Default::default(),
+            service: Default::default(),
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
             volume: Default::default(),

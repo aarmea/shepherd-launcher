@@ -26,13 +26,13 @@ pub enum ClientCommand {
 }
 
 /// Client connection manager
-pub struct DaemonClient {
+pub struct ServiceClient {
     socket_path: std::path::PathBuf,
     state: SharedState,
     command_rx: mpsc::UnboundedReceiver<ClientCommand>,
 }
 
-impl DaemonClient {
+impl ServiceClient {
     pub fn new(
         socket_path: impl AsRef<Path>,
         state: SharedState,
@@ -67,13 +67,13 @@ impl DaemonClient {
     async fn connect_and_run(&mut self) -> Result<()> {
         self.state.set(LauncherState::Connecting);
 
-        info!(path = %self.socket_path.display(), "Connecting to daemon");
+        info!(path = %self.socket_path.display(), "Connecting to shepherdd");
         
         let mut client = IpcClient::connect(&self.socket_path)
             .await
-            .context("Failed to connect to daemon")?;
+            .context("Failed to connect to shepherdd")?;
 
-        info!("Connected to daemon");
+        info!("Connected to shepherdd");
 
         // Get initial state (includes entries)
         info!("Sending GetState command");
@@ -116,11 +116,11 @@ impl DaemonClient {
                     }
                 }
 
-                // Handle events from daemon
+                // Handle events from shepherdd
                 event_result = events.next() => {
                     match event_result {
                         Ok(event) => {
-                            info!(event = ?event, "Received event from daemon (client.rs)");
+                            info!(event = ?event, "Received event from shepherdd (client.rs)");
                             self.state.handle_event(event);
                         }
                         Err(e) => {

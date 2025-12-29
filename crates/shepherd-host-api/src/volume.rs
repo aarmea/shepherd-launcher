@@ -1,7 +1,7 @@
 //! Volume control trait interfaces
 //!
 //! Defines the capability-based interface for volume control between
-//! the daemon core and platform-specific implementations.
+//! the shepherdd service and platform-specific implementations.
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -67,9 +67,9 @@ pub struct VolumeCapabilities {
 /// Volume restrictions that can be enforced by policy
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct VolumeRestrictions {
-    /// Maximum volume percentage allowed (enforced by daemon)
+    /// Maximum volume percentage allowed (enforced by the service)
     pub max_volume: Option<u8>,
-    /// Minimum volume percentage allowed (enforced by daemon)
+    /// Minimum volume percentage allowed (enforced by the service)
     pub min_volume: Option<u8>,
     /// Whether mute toggle is allowed
     pub allow_mute: bool,

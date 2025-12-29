@@ -225,8 +225,8 @@ impl ManagedProcess {
 
         // Special handling for WAYLAND_DISPLAY:
         // If SHEPHERD_WAYLAND_DISPLAY is set, use that instead of the inherited value.
-        // This allows apps to be launched on a nested compositor while the daemon
-        // runs on the parent compositor. When the daemon runs inside the nested
+        // This allows apps to be launched on a nested compositor while the service
+        // runs on the parent compositor. When the service runs inside the nested
         // compositor, this is not needed as WAYLAND_DISPLAY is already correct.
         if let Ok(shepherd_display) = std::env::var("SHEPHERD_WAYLAND_DISPLAY") {
             debug!(display = %shepherd_display, "Using SHEPHERD_WAYLAND_DISPLAY override for child process");

@@ -82,7 +82,7 @@ impl LinuxHost {
                     info!(pid = pid, pgid = pgid, status = ?status, "Process exited - sending HostEvent::Exited");
 
                     // We don't have the session_id here, so we use a placeholder
-                    // The daemon should track the mapping
+                    // The service should track the mapping
                     let handle = HostSessionHandle::new(
                         SessionId::new(), // This will be matched by PID
                         HostHandlePayload::Linux { pid, pgid },

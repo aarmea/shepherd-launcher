@@ -1,6 +1,6 @@
 //! Host adapter trait interfaces for shepherdd
 //!
-//! This crate defines the capability-based interface between the daemon core
+//! This crate defines the capability-based interface between the shepherdd service
 //! and platform-specific implementations. It contains no platform code itself.
 
 mod capabilities;

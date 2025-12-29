@@ -10,18 +10,18 @@ pub struct RawConfig {
     /// Config schema version
     pub config_version: u32,
 
-    /// Global daemon settings
-    #[serde(default)]
-    pub daemon: RawDaemonConfig,
+    /// Global service settings
+    #[serde(default, alias = "daemon")]
+    pub service: RawServiceConfig,
 
     /// List of allowed entries
     #[serde(default)]
     pub entries: Vec<RawEntry>,
 }
 
-/// Daemon-level settings
+/// Service-level settings
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
-pub struct RawDaemonConfig {
+pub struct RawServiceConfig {
     /// IPC socket path (default: /run/shepherdd/shepherdd.sock)
     pub socket_path: Option<PathBuf>,
 

@@ -1,6 +1,6 @@
 //! Launcher application state management
 
-use shepherd_api::{DaemonStateSnapshot, EntryView, Event, EventPayload};
+use shepherd_api::{ServiceStateSnapshot, EntryView, Event, EventPayload};
 use shepherd_util::SessionId;
 use std::sync::Arc;
 use std::time::Duration;
@@ -9,7 +9,7 @@ use tokio::sync::watch;
 /// Current state of the launcher UI
 #[derive(Debug, Clone)]
 pub enum LauncherState {
-    /// Not connected to daemon
+    /// Not connected to shepherdd
     Disconnected,
     /// Connected, waiting for initial state
     Connecting,
@@ -58,9 +58,9 @@ impl SharedState {
         self.receiver.clone()
     }
 
-    /// Update state from daemon event
+    /// Update state from shepherdd event
     pub fn handle_event(&self, event: Event) {
-        tracing::info!(event = ?event.payload, "Received event from daemon");
+        tracing::info!(event = ?event.payload, "Received event from shepherdd");
         match event.payload {
             EventPayload::StateChanged(snapshot) => {
                 tracing::info!(has_session = snapshot.current_session.is_some(), "Applying state snapshot");
@@ -109,7 +109,7 @@ impl SharedState {
                 self.set(LauncherState::Connecting);
             }
             EventPayload::Shutdown => {
-                // Daemon is shutting down
+                // Service is shutting down
                 self.set(LauncherState::Disconnected);
             }
             EventPayload::AuditEntry { .. } => {
@@ -121,7 +121,7 @@ impl SharedState {
         }
     }
 
-    fn apply_snapshot(&self, snapshot: DaemonStateSnapshot) {
+    fn apply_snapshot(&self, snapshot: ServiceStateSnapshot) {
         if let Some(session) = snapshot.current_session {
             let now = shepherd_util::now();
             // For unlimited sessions (deadline=None), time_remaining is None

@@ -15,7 +15,7 @@ pub struct IpcClient {
 }
 
 impl IpcClient {
-    /// Connect to the daemon
+    /// Connect to shepherdd
     pub async fn connect(socket_path: impl AsRef<Path>) -> IpcResult<Self> {
         let stream = UnixStream::connect(socket_path).await?;
         let (read_half, write_half) = stream.into_split();
@@ -67,7 +67,7 @@ impl IpcClient {
     }
 }
 
-/// Stream of events from the daemon
+/// Stream of events from shepherdd
 pub struct EventStream {
     reader: BufReader<tokio::net::unix::OwnedReadHalf>,
 }

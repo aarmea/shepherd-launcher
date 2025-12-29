@@ -236,7 +236,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     volume_slider.set_increments(5.0, 10.0);
     volume_slider.add_css_class("volume-slider");
 
-    // Set initial value from daemon
+    // Set initial value from shepherdd
     if let Some(info) = crate::volume::get_volume_status() {
         volume_slider.set_value(info.percent as f64);
     }
@@ -333,7 +333,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         let session_state = state_for_close.session_state();
         if let Some(session_id) = session_state.session_id() {
             tracing::info!("Requesting end session for {}", session_id);
-            // Send StopCurrent command to daemon
+            // Send StopCurrent command to shepherdd
             let socket_path = std::env::var("SHEPHERD_SOCKET")
                 .unwrap_or_else(|_| "./dev-runtime/shepherd.sock".to_string());
             std::thread::spawn(move || {
@@ -349,7 +349,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Failed to connect to daemon: {}", e);
+                            tracing::error!("Failed to connect to shepherdd: {}", e);
                         }
                     }
                 });

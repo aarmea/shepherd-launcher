@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use shepherd_util::{EntryId, SessionId};
 use std::time::Duration;
 
-use crate::{DaemonStateSnapshot, SessionEndReason, WarningSeverity, API_VERSION};
+use crate::{ServiceStateSnapshot, SessionEndReason, WarningSeverity, API_VERSION};
 
 /// Event envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,12 +25,12 @@ impl Event {
     }
 }
 
-/// All possible events from daemon to clients
+/// All possible events from the service to clients
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum EventPayload {
     /// Full state snapshot (sent on subscribe and major changes)
-    StateChanged(DaemonStateSnapshot),
+    StateChanged(ServiceStateSnapshot),
 
     /// Session has started
     SessionStarted {
@@ -80,7 +80,7 @@ pub enum EventPayload {
         muted: bool,
     },
 
-    /// Daemon is shutting down
+    /// Service is shutting down
     Shutdown,
 
     /// Audit event (for admin clients)

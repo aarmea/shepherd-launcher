@@ -10,7 +10,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info};
 
-use crate::client::{ClientCommand, CommandClient, DaemonClient};
+use crate::client::{ClientCommand, CommandClient, ServiceClient};
 use crate::grid::LauncherGrid;
 use crate::state::{LauncherState, SharedState};
 
@@ -188,7 +188,7 @@ impl LauncherApp {
                 match client.launch(&entry_id).await {
                     Ok(response) => {
                         debug!(response = ?response, "Launch response");
-                        // Handle error responses from daemon
+                        // Handle error responses from shepherdd
                         match response.result {
                             shepherd_api::ResponseResult::Ok(payload) => {
                                 // Check what kind of success response we got
@@ -227,7 +227,7 @@ impl LauncherApp {
                             shepherd_api::ResponseResult::Err(err) => {
                                 // Launch failed on server side - refresh state to recover
                                 error!(error = %err.message, "Launch failed on server");
-                                // Request fresh state from daemon to get back to correct state
+                                // Request fresh state from shepherdd to get back to correct state
                                 match client.get_state().await {
                                     Ok(state_resp) => {
                                         if let shepherd_api::ResponseResult::Ok(
@@ -293,14 +293,14 @@ impl LauncherApp {
             });
         });
 
-        // Start daemon client in background thread (separate from GTK main loop)
+        // Start shepherdd client in background thread (separate from GTK main loop)
         // This ensures the tokio runtime is properly driven for event reception
         let state_for_client = state.clone();
         let socket_for_client = socket_path.clone();
         std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime for event loop");
             rt.block_on(async move {
-                let client = DaemonClient::new(socket_for_client, state_for_client, command_rx);
+                let client = ServiceClient::new(socket_for_client, state_for_client, command_rx);
                 client.run().await;
             });
         });

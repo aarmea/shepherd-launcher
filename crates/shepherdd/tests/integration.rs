@@ -1,6 +1,6 @@
 //! Integration tests for shepherdd
 //!
-//! These tests verify the end-to-end behavior of the daemon.
+//! These tests verify the end-to-end behavior of shepherdd.
 
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy, Policy};
@@ -14,7 +14,7 @@ use std::time::Duration;
 
 fn make_test_policy() -> Policy {
     Policy {
-        daemon: Default::default(),
+        service: Default::default(),
         entries: vec![
             Entry {
                 id: EntryId::new("test-game"),

@@ -100,7 +100,7 @@ pub enum ErrorCode {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Command {
-    /// Get current daemon state
+    /// Get current service state
     GetState,
 
     /// List available entries
@@ -160,7 +160,7 @@ pub enum Command {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ResponsePayload {
-    State(crate::DaemonStateSnapshot),
+    State(crate::ServiceStateSnapshot),
     Entries(Vec<crate::EntryView>),
     LaunchApproved {
         session_id: shepherd_util::SessionId,
@@ -234,7 +234,7 @@ mod tests {
     fn response_serialization() {
         let resp = Response::success(
             1,
-            ResponsePayload::State(crate::DaemonStateSnapshot {
+            ResponsePayload::State(crate::ServiceStateSnapshot {
                 api_version: API_VERSION,
                 policy_loaded: true,
                 current_session: None,

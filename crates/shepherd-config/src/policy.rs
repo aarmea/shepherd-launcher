@@ -1,6 +1,6 @@
 //! Validated policy structures
 
-use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawVolumeConfig, RawWarningThreshold};
+use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock};
@@ -11,8 +11,8 @@ use std::time::Duration;
 /// Validated policy ready for use by the core engine
 #[derive(Debug, Clone)]
 pub struct Policy {
-    /// Daemon configuration
-    pub daemon: DaemonConfig,
+    /// Service configuration
+    pub service: ServiceConfig,
 
     /// Validated entries
     pub entries: Vec<Entry>,
@@ -31,7 +31,7 @@ impl Policy {
     /// Convert from raw config (after validation)
     pub fn from_raw(raw: RawConfig) -> Self {
         let default_warnings = raw
-            .daemon
+            .service
             .default_warnings
             .clone()
             .map(|w| w.into_iter().map(convert_warning).collect())
@@ -39,13 +39,13 @@ impl Policy {
 
         // 0 means unlimited, None means use 1 hour default
         let default_max_run = raw
-            .daemon
+            .service
             .default_max_run_seconds
             .map(seconds_to_duration_or_unlimited)
             .unwrap_or(Some(Duration::from_secs(3600))); // 1 hour default
 
         let global_volume = raw
-            .daemon
+            .service
             .volume
             .as_ref()
             .map(convert_volume_config)
@@ -58,7 +58,7 @@ impl Policy {
             .collect();
 
         Self {
-            daemon: DaemonConfig::from_raw(raw.daemon),
+            service: ServiceConfig::from_raw(raw.service),
             entries,
             default_warnings,
             default_max_run,
@@ -72,16 +72,16 @@ impl Policy {
     }
 }
 
-/// Daemon configuration
+/// Service configuration
 #[derive(Debug, Clone)]
-pub struct DaemonConfig {
+pub struct ServiceConfig {
     pub socket_path: PathBuf,
     pub log_dir: PathBuf,
     pub data_dir: PathBuf,
 }
 
-impl DaemonConfig {
-    fn from_raw(raw: crate::schema::RawDaemonConfig) -> Self {
+impl ServiceConfig {
+    fn from_raw(raw: RawServiceConfig) -> Self {
         Self {
             socket_path: raw
                 .socket_path
@@ -96,7 +96,7 @@ impl DaemonConfig {
     }
 }
 
-impl Default for DaemonConfig {
+impl Default for ServiceConfig {
     fn default() -> Self {
         Self {
             socket_path: PathBuf::from("/run/shepherdd/shepherdd.sock"),
@@ -208,9 +208,9 @@ pub struct LimitsPolicy {
 /// Volume control policy
 #[derive(Debug, Clone, Default)]
 pub struct VolumePolicy {
-    /// Maximum volume percentage allowed (enforced by daemon)
+    /// Maximum volume percentage allowed (enforced by the service)
     pub max_volume: Option<u8>,
-    /// Minimum volume percentage allowed (enforced by daemon)
+    /// Minimum volume percentage allowed (enforced by the service)
     pub min_volume: Option<u8>,
     /// Whether mute toggle is allowed
     pub allow_mute: bool,

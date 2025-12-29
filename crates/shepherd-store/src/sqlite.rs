@@ -272,12 +272,12 @@ mod tests {
     fn test_audit_log() {
         let store = SqliteStore::in_memory().unwrap();
 
-        let event = AuditEvent::new(AuditEventType::DaemonStarted);
+        let event = AuditEvent::new(AuditEventType::ServiceStarted);
         store.append_audit(event).unwrap();
 
         let events = store.get_recent_audits(10).unwrap();
         assert_eq!(events.len(), 1);
-        assert!(matches!(events[0].event, AuditEventType::DaemonStarted));
+        assert!(matches!(events[0].event, AuditEventType::ServiceStarted));
     }
 
     #[test]

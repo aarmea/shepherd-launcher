@@ -3,7 +3,7 @@
 
 config_version = 1
 
-[daemon]
+[service]
 # Uncomment to customize paths
 # socket_path = "/run/shepherdd/shepherdd.sock"
 # log_dir = "/var/log/shepherdd"
@@ -15,24 +15,24 @@ default_max_run_seconds = 3600
 
 # Global volume restrictions (optional)
 # These apply when no entry-specific restrictions are defined
-[daemon.volume]
+[service.volume]
 max_volume = 80      # Maximum volume percentage (0-100)
 # min_volume = 20    # Minimum volume percentage (0-100)
 allow_mute = true    # Whether mute toggle is allowed
 allow_change = true  # Whether volume changes are allowed at all
 
 # Default warning thresholds
-[[daemon.default_warnings]]
+[[service.default_warnings]]
 seconds_before = 300
 severity = "info"
 message = "5 minutes remaining"
 
-[[daemon.default_warnings]]
+[[service.default_warnings]]
 seconds_before = 60
 severity = "warn"
 message = "1 minute remaining!"
 
-[[daemon.default_warnings]]
+[[service.default_warnings]]
 seconds_before = 10
 severity = "critical"
 message = "10 seconds remaining!"
@@ -232,7 +232,7 @@ days = "weekends"
 start = "10:00"
 end = "20:00"
 
-# No [entries.limits] section - uses daemon defaults
+# No [entries.limits] section - uses service defaults
 # Omitting limits entirely uses default_max_run_seconds
 
 ## === Media ===

@@ -1,4 +1,4 @@
-//! shepherdd - The shepherd daemon
+//! shepherdd - The shepherd background service
 //!
 //! This is the main entry point for the shepherdd service.
 //! It wires together all the components:
@@ -12,7 +12,7 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use shepherd_api::{
-    Command, DaemonStateSnapshot, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
+    Command, ServiceStateSnapshot, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
     Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
     API_VERSION,
 };
@@ -30,10 +30,10 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn, Level};
 use tracing_subscriber::EnvFilter;
 
-/// shepherdd - Policy enforcement daemon for child-focused computing
+/// shepherdd - Policy enforcement service for child-focused computing
 #[derive(Parser, Debug)]
 #[command(name = "shepherdd")]
-#[command(about = "Policy enforcement daemon for child-focused computing", long_about = None)]
+#[command(about = "Policy enforcement service for child-focused computing", long_about = None)]
 struct Args {
     /// Configuration file path
     #[arg(short, long, default_value = "/etc/shepherdd/config.toml")]
@@ -52,8 +52,8 @@ struct Args {
     log_level: String,
 }
 
-/// Main daemon state
-struct Daemon {
+/// Main service state
+struct Service {
     engine: CoreEngine,
     host: Arc<LinuxHost>,
     volume: Arc<LinuxVolumeController>,
@@ -62,7 +62,7 @@ struct Daemon {
     rate_limiter: RateLimiter,
 }
 
-impl Daemon {
+impl Service {
     async fn new(args: &Args) -> Result<Self> {
         // Load configuration
         let policy = load_config(&args.config)
@@ -78,12 +78,12 @@ impl Daemon {
         let socket_path = args
             .socket
             .clone()
-            .unwrap_or_else(|| policy.daemon.socket_path.clone());
+            .unwrap_or_else(|| policy.service.socket_path.clone());
 
         let data_dir = args
             .data_dir
             .clone()
-            .unwrap_or_else(|| policy.daemon.data_dir.clone());
+            .unwrap_or_else(|| policy.service.data_dir.clone());
 
         // Create data directory
         std::fs::create_dir_all(&data_dir)
@@ -98,8 +98,8 @@ impl Daemon {
 
         info!(db_path = %db_path.display(), "Store initialized");
 
-        // Log daemon start
-        store.append_audit(AuditEvent::new(AuditEventType::DaemonStarted))?;
+        // Log service start
+        store.append_audit(AuditEvent::new(AuditEventType::ServiceStarted))?;
 
         // Initialize host adapter
         let host = Arc::new(LinuxHost::new());
@@ -168,7 +168,7 @@ impl Daemon {
         let tick_interval = Duration::from_millis(100);
         let mut tick_timer = tokio::time::interval(tick_interval);
 
-        info!("Daemon running");
+        info!("Service running");
 
         loop {
             tokio::select! {
@@ -940,7 +940,7 @@ async fn main() -> Result<()> {
         "shepherdd starting"
     );
 
-    // Create and run daemon
-    let daemon = Daemon::new(&args).await?;
-    daemon.run().await
+    // Create and run the service
+    let service = Service::new(&args).await?;
+    service.run().await
 }

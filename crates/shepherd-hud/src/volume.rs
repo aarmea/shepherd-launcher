@@ -1,7 +1,7 @@
 //! Volume monitoring and control module
 //!
-//! Provides volume status and control via the shepherdd daemon.
-//! The daemon handles actual volume control and enforces restrictions.
+//! Provides volume status and control via shepherdd.
+//! The service handles actual volume control and enforces restrictions.
 
 use shepherd_api::{Command, ResponsePayload, VolumeInfo};
 use shepherd_ipc::IpcClient;
@@ -15,7 +15,7 @@ fn get_socket_path() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("./dev-runtime/shepherd.sock"))
 }
 
-/// Get current volume status from the daemon
+/// Get current volume status from shepherdd
 pub fn get_volume_status() -> Option<VolumeInfo> {
     let socket_path = get_socket_path();
 
@@ -45,14 +45,14 @@ pub fn get_volume_status() -> Option<VolumeInfo> {
                 }
             },
             Err(e) => {
-                tracing::debug!("Failed to connect to daemon for volume: {}", e);
+                tracing::debug!("Failed to connect to shepherdd for volume: {}", e);
                 None
             }
         }
     })
 }
 
-/// Toggle mute state via the daemon
+/// Toggle mute state via shepherdd
 pub fn toggle_mute() -> anyhow::Result<()> {
     let socket_path = get_socket_path();
 
@@ -75,7 +75,7 @@ pub fn toggle_mute() -> anyhow::Result<()> {
     })
 }
 
-/// Increase volume by a step via the daemon
+/// Increase volume by a step via shepherdd
 pub fn volume_up(step: u8) -> anyhow::Result<()> {
     let socket_path = get_socket_path();
 
@@ -98,7 +98,7 @@ pub fn volume_up(step: u8) -> anyhow::Result<()> {
     })
 }
 
-/// Decrease volume by a step via the daemon
+/// Decrease volume by a step via shepherdd
 pub fn volume_down(step: u8) -> anyhow::Result<()> {
     let socket_path = get_socket_path();
 
@@ -121,7 +121,7 @@ pub fn volume_down(step: u8) -> anyhow::Result<()> {
     })
 }
 
-/// Set volume to a specific percentage via the daemon
+/// Set volume to a specific percentage via shepherdd
 pub fn set_volume(percent: u8) -> anyhow::Result<()> {
     let socket_path = get_socket_path();
 

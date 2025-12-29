@@ -155,8 +155,8 @@ pub enum SessionEndReason {
     ProcessExited { exit_code: Option<i32> },
     /// Policy change terminated session
     PolicyStop,
-    /// Daemon shutdown
-    DaemonShutdown,
+    /// Service shutdown
+    ServiceShutdown,
     /// Launch failed
     LaunchFailed { error: String },
 }
@@ -187,9 +187,9 @@ pub struct SessionInfo {
     pub warnings_issued: Vec<u64>,
 }
 
-/// Full daemon state snapshot
+/// Full service state snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DaemonStateSnapshot {
+pub struct ServiceStateSnapshot {
     pub api_version: u32,
     pub policy_loaded: bool,
     pub current_session: Option<SessionInfo>,

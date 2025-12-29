@@ -1,9 +1,9 @@
 //! Protocol types for shepherdd IPC
 //!
-//! This crate defines the stable API between the daemon and clients:
+//! This crate defines the stable API between shepherdd and clients:
 //! - Commands (requests from clients)
 //! - Responses
-//! - Events (daemon -> clients)
+//! - Events (service -> clients)
 //! - Versioning
 
 mod commands;

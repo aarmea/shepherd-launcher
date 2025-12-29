@@ -3,7 +3,7 @@ name = "shepherdd"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "The shepherdd daemon: policy enforcement for child-focused computing"
+description = "The shepherdd background service: policy enforcement for child-focused computing"
 
 [[bin]]
 name = "shepherdd"
