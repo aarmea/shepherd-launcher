@@ -1,0 +1,10 @@
+# Clippy configuration for shepherd-launcher
+#
+# This file configures clippy lints for the workspace.
+
+# Disallow direct usage of Local::now() to ensure mock time is used consistently.
+# Use shepherd_util::now() instead, which respects the SHEPHERD_MOCK_TIME env var
+# in debug builds.
+disallowed-methods = [
+    { path = "chrono::Local::now", reason = "Use shepherd_util::now() instead to support mock time in debug builds" },
+]

@@ -114,7 +114,7 @@ impl Store for SqliteStore {
             let (id, timestamp_str, event_json) = row?;
             let timestamp = DateTime::parse_from_rfc3339(&timestamp_str)
                 .map(|dt| dt.with_timezone(&Local))
-                .unwrap_or_else(|_| Local::now());
+                .unwrap_or_else(|_| shepherd_util::now());
             let event: crate::AuditEventType = serde_json::from_str(&event_json)?;
 
             events.push(AuditEvent {
@@ -284,7 +284,7 @@ mod tests {
     fn test_usage_accounting() {
         let store = SqliteStore::in_memory().unwrap();
         let entry_id = EntryId::new("game-1");
-        let today = Local::now().date_naive();
+        let today = shepherd_util::now().date_naive();
 
         // Initially zero
         let usage = store.get_usage(&entry_id, today).unwrap();
@@ -314,7 +314,7 @@ mod tests {
         assert!(store.get_cooldown_until(&entry_id).unwrap().is_none());
 
         // Set cooldown
-        let until = Local::now() + chrono::Duration::hours(1);
+        let until = shepherd_util::now() + chrono::Duration::hours(1);
         store.set_cooldown_until(&entry_id, until).unwrap();
 
         let stored = store.get_cooldown_until(&entry_id).unwrap().unwrap();
@@ -334,7 +334,7 @@ mod tests {
 
         // Save snapshot
         let snapshot = StateSnapshot {
-            timestamp: Local::now(),
+            timestamp: shepherd_util::now(),
             active_session: None,
         };
         store.save_snapshot(&snapshot).unwrap();

@@ -81,9 +81,12 @@ TODO
 
 ## Development
 
-TODO: `./run-dev`, options
+tl;dr:
+* Run in development: `./run-dev`
 * Set the `SHEPHERD_MOCK_TIME` environment variable to mock the time,
   such as `SHEPHERD_MOCK_TIME="2025-12-25 15:30:00" ./run-dev`
+* Run tests: `cargo test`
+* Lint: `cargo clippy`
 
 ## Contributing
 

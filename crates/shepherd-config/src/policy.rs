@@ -349,7 +349,7 @@ mod tests {
             always: true,
         };
 
-        let dt = Local::now();
+        let dt = shepherd_util::now();
         assert!(policy.is_available(&dt));
     }
 

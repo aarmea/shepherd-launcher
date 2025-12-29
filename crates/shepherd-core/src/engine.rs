@@ -591,7 +591,7 @@ mod tests {
         let caps = HostCapabilities::minimal();
         let engine = CoreEngine::new(policy, store, caps);
 
-        let entries = engine.list_entries(Local::now());
+        let entries = engine.list_entries(shepherd_util::now());
         assert_eq!(entries.len(), 1);
         assert!(entries[0].enabled);
     }
@@ -604,7 +604,7 @@ mod tests {
         let engine = CoreEngine::new(policy, store, caps);
 
         let entry_id = EntryId::new("test-game");
-        let decision = engine.request_launch(&entry_id, Local::now());
+        let decision = engine.request_launch(&entry_id, shepherd_util::now());
 
         assert!(matches!(decision, LaunchDecision::Approved(_)));
     }
@@ -617,7 +617,7 @@ mod tests {
         let mut engine = CoreEngine::new(policy, store, caps);
 
         let entry_id = EntryId::new("test-game");
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         // Launch first session
@@ -672,7 +672,7 @@ mod tests {
         let mut engine = CoreEngine::new(policy, store, caps);
 
         let entry_id = EntryId::new("test");
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         // Start session
@@ -733,7 +733,7 @@ mod tests {
         let mut engine = CoreEngine::new(policy, store, caps);
 
         let entry_id = EntryId::new("test");
-        let now = Local::now();
+        let now = shepherd_util::now();
         let now_mono = MonotonicInstant::now();
 
         // Start session

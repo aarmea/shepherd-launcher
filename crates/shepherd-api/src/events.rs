@@ -100,7 +100,7 @@ mod tests {
             session_id: SessionId::new(),
             entry_id: EntryId::new("game-1"),
             label: "Test Game".into(),
-            deadline: Some(Local::now()),
+            deadline: Some(shepherd_util::now()),
         });
 
         let json = serde_json::to_string(&event).unwrap();

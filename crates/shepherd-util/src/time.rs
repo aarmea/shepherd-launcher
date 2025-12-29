@@ -30,6 +30,7 @@ static MOCK_TIME_OFFSET: OnceLock<Option<chrono::Duration>> = OnceLock::new();
 
 /// Initialize the mock time offset based on the environment variable.
 /// Returns the offset between mock time and real time at process start.
+#[allow(clippy::disallowed_methods)] // This is the internal implementation that wraps Local::now()
 fn get_mock_time_offset() -> Option<chrono::Duration> {
     *MOCK_TIME_OFFSET.get_or_init(|| {
         #[cfg(debug_assertions)]
@@ -79,6 +80,7 @@ pub fn is_mock_time_active() -> bool {
 /// In release builds, this always returns the real system time.
 /// In debug builds, if `SHEPHERD_MOCK_TIME` is set, this returns a time
 /// that advances from the mock time at the same rate as real time.
+#[allow(clippy::disallowed_methods)] // This is the wrapper that provides mock time support
 pub fn now() -> DateTime<Local> {
     let real_now = chrono::Local::now();
     
@@ -464,6 +466,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::disallowed_methods)] // Testing the offset calculation requires real time
     fn test_mock_time_offset_calculation() {
         // Test that the offset calculation works correctly
         let mock_time_str = "2025-12-25 14:30:00";
@@ -487,6 +490,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::disallowed_methods)] // Testing time advancement requires real time
     fn test_mock_time_advances_with_real_time() {
         // Test that mock time advances at the same rate as real time
         // This tests the concept, not the actual implementation (since OnceLock is static)
