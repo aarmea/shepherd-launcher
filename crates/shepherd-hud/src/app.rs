@@ -182,10 +182,6 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         .spacing(4)
         .build();
 
-    let clock_icon = gtk4::Image::from_icon_name("preferences-system-time-symbolic");
-    clock_icon.set_pixel_size(20);
-    clock_box.append(&clock_icon);
-
     let clock_label = gtk4::Label::new(Some("--:--"));
     clock_label.add_css_class("clock-label");
     clock_box.append(&clock_label);

@@ -92,8 +92,9 @@ pub fn now() -> DateTime<Local> {
 }
 
 /// Format a DateTime for display in the HUD clock.
+/// Always uses 12-hour format with AM/PM, ignoring system locale.
 pub fn format_clock_time(dt: &DateTime<Local>) -> String {
-    dt.format("%H:%M").to_string()
+    dt.format("%l:%M %p").to_string()
 }
 
 /// Format a DateTime for display with full date and time.
@@ -396,7 +397,7 @@ mod tests {
     #[test]
     fn test_format_clock_time() {
         let dt = Local.with_ymd_and_hms(2025, 12, 25, 14, 30, 45).unwrap();
-        assert_eq!(format_clock_time(&dt), "14:30");
+        assert_eq!(format_clock_time(&dt), "02:30 PM");
     }
 
     #[test]
