@@ -84,14 +84,37 @@ impl LauncherTile {
             shepherd_api::EntryKindTag::Custom => "applications-other",
         };
 
-        // Set icon, checking if the requested icon exists in the theme
+        // Set icon, first trying to load as an image file, then as an icon name
         if let Some(ref icon_ref) = entry.icon_ref {
-            // Check if the icon exists in the default icon theme
-            let icon_theme = gtk4::IconTheme::for_display(&self.display());
-            if icon_theme.has_icon(icon_ref) {
-                imp.icon.set_icon_name(Some(icon_ref));
+            let mut loaded = false;
+            
+            // First, try to load as an image file (JPG, PNG, etc.)
+            // Expand ~ to home directory if present
+            let expanded_path = if icon_ref.starts_with("~/") {
+                if let Some(home) = dirs::home_dir() {
+                    icon_ref.replacen("~", &home.to_string_lossy(), 1)
+                } else {
+                    icon_ref.clone()
+                }
             } else {
-                imp.icon.set_icon_name(Some(fallback_icon));
+                icon_ref.clone()
+            };
+            
+            let path = std::path::Path::new(&expanded_path);
+            if path.exists() && path.is_file() {
+                // Try to load as an image file
+                imp.icon.set_from_file(Some(path));
+                loaded = true;
+            }
+            
+            // If not loaded as a file, try as an icon name from the theme
+            if !loaded {
+                let icon_theme = gtk4::IconTheme::for_display(&self.display());
+                if icon_theme.has_icon(icon_ref) {
+                    imp.icon.set_icon_name(Some(icon_ref));
+                } else {
+                    imp.icon.set_icon_name(Some(fallback_icon));
+                }
             }
         } else {
             imp.icon.set_icon_name(Some(fallback_icon));
