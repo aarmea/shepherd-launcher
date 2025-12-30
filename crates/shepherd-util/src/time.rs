@@ -99,7 +99,7 @@ pub fn format_clock_time(dt: &DateTime<Local>) -> String {
 
 /// Format a DateTime for display with full date and time.
 pub fn format_datetime_full(dt: &DateTime<Local>) -> String {
-    dt.format("%Y-%m-%d %H:%M:%S").to_string()
+    dt.format("%Y-%m-%d %l:%M:%S %p").to_string()
 }
 
 /// Represents a point in monotonic time for countdown enforcement.

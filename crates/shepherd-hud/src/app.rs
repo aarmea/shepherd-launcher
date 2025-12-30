@@ -185,6 +185,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     let clock_label = gtk4::Label::new(Some("--:--"));
     clock_label.add_css_class("clock-label");
     clock_box.append(&clock_label);
+    let mut clock_format_full = false;
 
     // Add mock indicator if mock time is active (debug builds only)
     #[cfg(debug_assertions)]
@@ -193,6 +194,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
             let mock_indicator = gtk4::Label::new(Some("(MOCK)"));
             mock_indicator.add_css_class("mock-time-indicator");
             clock_box.append(&mock_indicator);
+            clock_format_full = true;
         }
     }
 
@@ -369,7 +371,11 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     glib::timeout_add_local(Duration::from_millis(500), move || {
         // Update wall clock display
         let current_time = shepherd_util::now();
-        clock_label_clone.set_text(&shepherd_util::format_clock_time(&current_time));
+        if clock_format_full {
+            clock_label_clone.set_text(&shepherd_util::format_datetime_full(&current_time));
+        } else {
+            clock_label_clone.set_text(&shepherd_util::format_clock_time(&current_time));
+        }
 
         // Update session state
         let session_state = state.session_state();
