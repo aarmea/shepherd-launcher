@@ -178,7 +178,7 @@ impl Service {
 
                     let events = {
                         let mut engine = engine.lock().await;
-                        engine.tick(now_mono)
+                        engine.tick(now_mono, now)
                     };
 
                     for event in events {
@@ -307,6 +307,15 @@ impl Service {
                     entry_id: entry_id.clone(),
                     enabled: *enabled,
                 }));
+            }
+
+            CoreEvent::AvailabilitySetChanged => {
+                // Time-based availability change - broadcast updated state
+                let state = {
+                    let engine = engine.lock().await;
+                    engine.get_state()
+                };
+                ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
             }
         }
     }

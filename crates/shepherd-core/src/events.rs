@@ -17,6 +17,9 @@ pub enum CoreEvent {
         deadline: Option<DateTime<Local>>,
     },
 
+    /// The set of available entries has changed (e.g., due to time window boundaries)
+    AvailabilitySetChanged,
+
     /// Warning threshold reached
     Warning {
         session_id: SessionId,

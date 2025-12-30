@@ -9,6 +9,7 @@ use shepherd_config::{Entry, Policy};
 use shepherd_host_api::{HostCapabilities, HostSessionHandle};
 use shepherd_store::{AuditEvent, AuditEventType, Store};
 use shepherd_util::{EntryId, MonotonicInstant, SessionId};
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info};
@@ -35,6 +36,8 @@ pub struct CoreEngine {
     store: Arc<dyn Store>,
     capabilities: HostCapabilities,
     current_session: Option<ActiveSession>,
+    /// Tracks which entries were enabled on the last tick, to detect availability changes
+    last_availability_set: HashSet<EntryId>,
 }
 
 impl CoreEngine {
@@ -59,6 +62,7 @@ impl CoreEngine {
             store,
             capabilities,
             current_session: None,
+            last_availability_set: HashSet::new(),
         }
     }
 
@@ -300,9 +304,28 @@ impl CoreEngine {
         }
     }
 
-    /// Tick the engine - check for warnings and expiry
-    pub fn tick(&mut self, now_mono: MonotonicInstant) -> Vec<CoreEvent> {
+    /// Tick the engine - check for warnings, expiry, and availability changes
+    pub fn tick(&mut self, now_mono: MonotonicInstant, now: DateTime<Local>) -> Vec<CoreEvent> {
         let mut events = Vec::new();
+
+        // Check if the set of available entries has changed
+        let current_availability: HashSet<EntryId> = self
+            .policy
+            .entries
+            .iter()
+            .filter(|e| self.evaluate_entry(e, now).enabled)
+            .map(|e| e.id.clone())
+            .collect();
+
+        if current_availability != self.last_availability_set {
+            debug!(
+                previous = ?self.last_availability_set,
+                current = ?current_availability,
+                "Entry availability set changed"
+            );
+            self.last_availability_set = current_availability;
+            events.push(CoreEvent::AvailabilitySetChanged);
+        }
 
         let session = match &mut self.current_session {
             Some(s) => s,
@@ -676,19 +699,23 @@ mod tests {
             engine.start_session(plan, now, now_mono);
         }
 
-        // No warnings initially
-        let events = engine.tick(now_mono);
-        assert!(events.is_empty());
+        // No warnings initially (first tick may emit AvailabilitySetChanged)
+        let events = engine.tick(now_mono, now);
+        // Filter to just warning events for this test
+        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        assert!(warning_events.is_empty());
 
         // At 70 seconds (10 seconds past warning threshold), warning should fire
         let later = now_mono + Duration::from_secs(70);
-        let events = engine.tick(later);
-        assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], CoreEvent::Warning { threshold_seconds: 60, .. }));
+        let events = engine.tick(later, now);
+        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        assert_eq!(warning_events.len(), 1);
+        assert!(matches!(warning_events[0], CoreEvent::Warning { threshold_seconds: 60, .. }));
 
         // Warning shouldn't fire twice
-        let events = engine.tick(later);
-        assert!(events.is_empty());
+        let events = engine.tick(later, now);
+        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        assert!(warning_events.is_empty());
     }
 
     #[test]
@@ -739,8 +766,10 @@ mod tests {
 
         // At 61 seconds, should be expired
         let later = now_mono + Duration::from_secs(61);
-        let events = engine.tick(later);
-        assert_eq!(events.len(), 1);
-        assert!(matches!(events[0], CoreEvent::ExpireDue { .. }));
+        let events = engine.tick(later, now);
+        // Filter to just expiry events for this test
+        let expiry_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::ExpireDue { .. })).collect();
+        assert_eq!(expiry_events.len(), 1);
+        assert!(matches!(expiry_events[0], CoreEvent::ExpireDue { .. }));
     }
 }
