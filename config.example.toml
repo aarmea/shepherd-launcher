@@ -48,7 +48,7 @@ message = "10 seconds remaining!"
 [[entries]]
 id = "tuxmath"
 label = "Tux Math"
-icon = "tuxmath"
+icon = "tuxmath"  # Icon name from system icon theme
 
 [entries.kind]
 type = "process"
@@ -74,7 +74,7 @@ end = "20:00"
 [[entries]]
 id = "scummvm-putt-putt"
 label = "Putt Putt Joins the Circus"
-icon = "scummvm"
+icon = "~/Games/Icons/Putt_Putt_Circus.png"  # Custom icon path
 
 [entries.kind]
 type = "process"
@@ -102,7 +102,7 @@ end = "20:00"
 [[entries]]
 id = "scummvm-monkey-island"
 label = "Secret of Monkey Island"
-icon = "scummvm"
+icon = "~/Games/Icons/Secret_of_Monkey_Island.png"  # Custom icon path
 
 [entries.kind]
 type = "process"
@@ -134,7 +134,7 @@ cooldown_seconds = 300  # 5 minute cooldown after each session
 [[entries]]
 id = "gcompris"
 label = "GCompris"
-icon = "gcompris"
+icon = "~/Games/Icons/GCompris.png"  # Custom icon path
 
 [entries.kind]
 type = "snap"
@@ -161,7 +161,7 @@ cooldown_seconds = 0  # No cooldown
 [[entries]]
 id = "minecraft"
 label = "Minecraft"
-icon = "minecraft"
+icon = "~/.minecraft/launcher/icons/minecraft256.png"
 
 [entries.kind]
 type = "snap"
@@ -240,14 +240,13 @@ end = "20:00"
 # Files can be local on your system or URLs (YouTube, etc).
 
 # "lofi hip hop radio 📚 beats to relax/study to" streamed live from YouTube
-# This should eventually be replaced with the media type.
 [[entries]]
 id = "lofi-beats"
 label = "Lofi Beats"
 icon = "mpv"
 
 [entries.kind]
-type = "process"
+type = "process"  # TODO: change to "media" type once supported
 command = "mpv"
 args = ["https://www.youtube.com/watch?v=jfKfPfyJRdk"]
 
