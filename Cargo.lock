@@ -1249,6 +1249,7 @@ name = "shepherd-host-linux"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "dirs",
  "nix",
  "serde",
  "shepherd-api",

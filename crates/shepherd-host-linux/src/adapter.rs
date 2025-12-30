@@ -15,6 +15,25 @@ use tracing::{info, warn};
 
 use crate::process::{init, kill_by_command, kill_snap_cgroup, ManagedProcess};
 
+/// Expand `~` at the beginning of a path to the user's home directory
+fn expand_tilde(path: &str) -> String {
+    if path.starts_with("~/") {
+        if let Some(home) = dirs::home_dir() {
+            return path.replacen("~", &home.to_string_lossy(), 1);
+        }
+    } else if path == "~" {
+        if let Some(home) = dirs::home_dir() {
+            return home.to_string_lossy().into_owned();
+        }
+    }
+    path.to_string()
+}
+
+/// Expand tilde in all arguments
+fn expand_args(args: &[String]) -> Vec<String> {
+    args.iter().map(|arg| expand_tilde(arg)).collect()
+}
+
 /// Information tracked for each session for cleanup purposes
 #[derive(Clone, Debug)]
 struct SessionInfo {
@@ -116,9 +135,12 @@ impl HostAdapter for LinuxHost {
         // Extract argv, env, cwd, and snap_name based on entry kind
         let (argv, env, cwd, snap_name) = match entry_kind {
             EntryKind::Process { command, args, env, cwd } => {
-                let mut argv = vec![command.clone()];
-                argv.extend(args.clone());
-                (argv, env.clone(), cwd.clone(), None)
+                let mut argv = vec![expand_tilde(command)];
+                argv.extend(expand_args(args));
+                let expanded_cwd = cwd.as_ref().map(|c| {
+                    std::path::PathBuf::from(expand_tilde(&c.to_string_lossy()))
+                });
+                (argv, env.clone(), expanded_cwd, None)
             }
             EntryKind::Snap { snap_name, command, args, env } => {
                 // For snap apps, we need to use 'snap run <snap_name>' to launch them.
@@ -130,7 +152,7 @@ impl HostAdapter for LinuxHost {
                     && cmd != snap_name {
                         argv.push(cmd.clone());
                     }
-                argv.extend(args.clone());
+                argv.extend(expand_args(args));
                 (argv, env.clone(), None, Some(snap_name.clone()))
             }
             EntryKind::Vm { driver, args } => {
@@ -149,7 +171,7 @@ impl HostAdapter for LinuxHost {
             EntryKind::Media { library_id, args: _ } => {
                 // For media, we'd typically launch a media player
                 // This is a placeholder - real implementation would integrate with a player
-                let argv = vec!["xdg-open".to_string(), library_id.clone()];
+                let argv = vec!["xdg-open".to_string(), expand_tilde(library_id)];
                 (argv, HashMap::new(), None, None)
             }
             EntryKind::Custom { type_name: _, payload: _ } => {

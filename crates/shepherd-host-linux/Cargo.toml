@@ -15,6 +15,7 @@ tracing = { workspace = true }
 tokio = { workspace = true }
 nix = { workspace = true }
 async-trait = "0.1"
+dirs = "5.0"
 
 [dev-dependencies]
 tempfile = { workspace = true }
