@@ -44,7 +44,8 @@ SHEPHERD_MOCK_TIME="2025-12-25 15:30:00" ./run-dev
 Time and activity history are maintained in a SQLite database, which
 `./run-dev` places at `./dev-runtime/data/shepherdd.db`. Edit this database
 using a tool like [DB Browser for SQLite](https://sqlitebrowser.org/) while the
-service is not running to inject application usage. [TODO: Link to schema docs]
+service is not running to inject application usage. The schema is defined in
+the [shepherd-store crate](./crates/shepherd-store/).
 
 ### Testing and linting
 
