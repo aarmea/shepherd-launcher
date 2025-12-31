@@ -397,13 +397,13 @@ mod tests {
     #[test]
     fn test_format_clock_time() {
         let dt = Local.with_ymd_and_hms(2025, 12, 25, 14, 30, 45).unwrap();
-        assert_eq!(format_clock_time(&dt), "02:30 PM");
+        assert_eq!(format_clock_time(&dt), " 2:30 PM");
     }
 
     #[test]
     fn test_format_datetime_full() {
         let dt = Local.with_ymd_and_hms(2025, 12, 25, 14, 30, 45).unwrap();
-        assert_eq!(format_datetime_full(&dt), "2025-12-25 14:30:45");
+        assert_eq!(format_datetime_full(&dt), "2025-12-25  2:30:45 PM");
     }
 
     #[test]

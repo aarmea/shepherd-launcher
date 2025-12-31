@@ -141,23 +141,25 @@ fn test_warning_emission() {
     engine.start_session(plan, now, now_mono);
 
     // No warnings at start
-    let events = engine.tick(now_mono);
+    let events = engine.tick(now_mono, now);
     assert!(events.is_empty());
 
     // At 6 seconds (4 seconds remaining), 5-second warning should fire
-    let at_6s = now_mono + Duration::from_secs(6);
-    let events = engine.tick(at_6s);
+    let at_6s_mono = now_mono + Duration::from_secs(6);
+    let at_6s = now + chrono::Duration::seconds(6);
+    let events = engine.tick(at_6s_mono, at_6s);
     assert_eq!(events.len(), 1);
     assert!(matches!(&events[0], CoreEvent::Warning { threshold_seconds: 5, .. }));
 
     // At 9 seconds (1 second remaining), 2-second warning should fire
-    let at_9s = now_mono + Duration::from_secs(9);
-    let events = engine.tick(at_9s);
+    let at_9s_mono = now_mono + Duration::from_secs(9);
+    let at_9s = now + chrono::Duration::seconds(9);
+    let events = engine.tick(at_9s_mono, at_9s);
     assert_eq!(events.len(), 1);
     assert!(matches!(&events[0], CoreEvent::Warning { threshold_seconds: 2, .. }));
 
     // Warnings shouldn't repeat
-    let events = engine.tick(at_9s);
+    let events = engine.tick(at_9s_mono, at_9s);
     assert!(events.is_empty());
 }
 
@@ -180,8 +182,9 @@ fn test_session_expiry() {
     engine.start_session(plan, now, now_mono);
 
     // At 11 seconds, session should be expired
-    let at_11s = now_mono + Duration::from_secs(11);
-    let events = engine.tick(at_11s);
+    let at_11s_mono = now_mono + Duration::from_secs(11);
+    let at_11s = now + chrono::Duration::seconds(11);
+    let events = engine.tick(at_11s_mono, at_11s);
 
     // Should have both remaining warnings + expiry
     let has_expiry = events.iter().any(|e| matches!(e, CoreEvent::ExpireDue { .. }));

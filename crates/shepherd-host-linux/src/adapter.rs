@@ -21,10 +21,10 @@ fn expand_tilde(path: &str) -> String {
         if let Some(home) = dirs::home_dir() {
             return path.replacen("~", &home.to_string_lossy(), 1);
         }
-    } else if path == "~" {
-        if let Some(home) = dirs::home_dir() {
-            return home.to_string_lossy().into_owned();
-        }
+    } else if path == "~"
+        && let Some(home) = dirs::home_dir()
+    {
+        return home.to_string_lossy().into_owned();
     }
     path.to_string()
 }
