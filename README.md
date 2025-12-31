@@ -23,7 +23,9 @@ or write your own.
 
 Activities can be made selectively available at certain times of day.
 
-![Home screen at 9:00 PM showing Lofi Beats as the only available activity.](./docs/readme/home-normal.png)
+![Home screen at 9:00 PM showing Lofi Beats as the only available activity.](./docs/readme/home-bedtime.png)
+
+This example, shown at 9 PM, has limited activities as a result.
 
 ### Time limits
 
@@ -32,7 +34,7 @@ Activities can have configurable time limits, including:
 * total usage per day
 * cooldown periods before that particular activity can be restarted
 
-<video src="./docs/readme/tuxmath-expiring.webm" width="1280" height="719" controls></video>
+[TuxMath session shown about to expire, including warnings and automatic termination](https://github.com/user-attachments/assets/541aa456-ef7c-4974-b918-5b143c5304c3)
 
 ### Anything on Linux
 
