@@ -19,7 +19,13 @@ or write your own.
 
 ### Home screen
 
+`shepherd-launcher` presents a list of activities for the user to pick from.
+
 ![Home screen at 3:00 PM showing the following set of activities: Tux Math, Putt Putt Joins the Circus, Secret of Monkey Island, GCompris, Minecraft, Celeste, A Short Hike, Big Buck Bunny, and Lofi Beats.](./docs/readme/home-normal.png)
+
+The flow of manually opening and closing activities should be familiar.
+
+["Happy path" demo showing home screen --> GCompris --> home screen](https://github.com/user-attachments/assets/1aed2040-b381-4022-8353-5ce076b1eee0)
 
 Activities can be made selectively available at certain times of day.
 
@@ -70,7 +76,7 @@ If it can run on Linux in *any way, shape, or form*, it can be supervised by
 
 Contributions are welcome for improvements and not yet implemented backends,
 such as:
-* Content-aware media player [TODO: link to issue]
+* Content-aware media player with supervised libraries [TODO: link to issue]
 * Pre-booted Steam to improve launch time [TODO: link to issue]
 * Android apps via Waydroid, including pre-booting Android if necessary [TODO: link to issue]
 * Legacy Win9x via DOSBox, QEMU, or PCem, including scripts to create a boot-to-app image [TODO: link to issue]
@@ -109,6 +115,8 @@ Contributions are welcome for:
 * an installation script [TODO: link to issue]
 
 ## Example configuration
+
+All behavior shown above is driven entirely by declarative configuration.
 
 For the Minecraft example shown above:
 
