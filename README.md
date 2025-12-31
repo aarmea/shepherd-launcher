@@ -19,9 +19,11 @@ or write your own.
 
 ### Home screen
 
+![Home screen at 3:00 PM showing the following set of activities: Tux Math, Putt Putt Joins the Circus, Secret of Monkey Island, GCompris, Minecraft, Celeste, A Short Hike, Big Buck Bunny, and Lofi Beats.](./docs/readme/home-normal.png)
+
 Activities can be made selectively available at certain times of day.
 
-TODO: home screen at different times (bedtime vs afternoon) showing different applications
+![Home screen at 9:00 PM showing Lofi Beats as the only available activity.](./docs/readme/home-normal.png)
 
 ### Time limits
 
@@ -30,22 +32,39 @@ Activities can have configurable time limits, including:
 * total usage per day
 * cooldown periods before that particular activity can be restarted
 
-TODO: GIF or video of GCompris a few seconds from closing, emphasizing:
-* Countdown clock
-* Warning messaging
-* Automatic close at end of time
-* Icon deliberately missing afterwards -- cooldown
+<video src="./docs/readme/tuxmath-expiring.webm" width="1280" height="719" controls></video>
 
 ### Anything on Linux
 
 If it can run on Linux in *any way, shape, or form*, it can be supervised by
 `shepherd-launcher`.
 
-TODO: show the following running with some subset of the above features highlighted:
-* Media (Big Buck Bunny locally, YouTube via `mpv`)
-* ScummVM games (Putt Putt, Secret of Monkey Island)
-* Minecraft
-* Steam games (Celeste, A Short Hike)
+!["Big Buck Bunny" hosted within shepherd-launcher UI](./docs/readme/apps-media.jpg)
+
+> [Big Buck Bunny](https://peach.blender.org/) playing locally via `mpv`
+
+!["Putt Putt Joins the Circus" hosted within shepherd-launcher UI](./docs/readme/apps-puttputt.png)
+
+> [Putt Putt Joins the Circus](https://humongous.fandom.com/wiki/Putt-Putt_Joins_the_Circus)
+> running via [ScummVM](https://www.scummvm.org/)
+
+!["The Secret of Monkey Island" hosted within shepherd-launcher UI](./docs/readme/apps-monkey.png)
+
+> [The Secret of Monkey Island](https://en.wikipedia.org/wiki/The_Secret_of_Monkey_Island)
+> running via [ScummVM](https://www.scummvm.org/)
+
+![Minecraft hosted within shepherd-launcher UI](./docs/readme/apps-minecraft.jpg)
+
+> [Minecraft](https://www.minecraft.net/) running via the
+> [mc-installer Snap](https://snapcraft.io/mc-installer)
+
+![Celeste hosted within shepherd-launcher UI](./docs/readme/apps-celeste.png)
+
+> [Celeste](https://www.celestegame.com/) running via Steam
+
+![A Short Hike hosted within shepherd-launcher UI](./docs/readme/apps-ashorthike.png)
+
+> [A Short Hike](https://ashorthike.com/) running via Steam
 
 Contributions are welcome for improvements and not yet implemented backends,
 such as:
