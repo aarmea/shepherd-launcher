@@ -19,9 +19,16 @@ or write your own.
 
 ### Home screen
 
+Activities can be made selectively available at certain times of day.
+
 TODO: home screen at different times (bedtime vs afternoon) showing different applications
 
 ### Time limits
+
+Activities can have configurable time limits, including:
+* individual session length
+* total usage per day
+* cooldown periods before that particular activity can be restarted
 
 TODO: GIF or video of GCompris a few seconds from closing, emphasizing:
 * Countdown clock
@@ -29,13 +36,16 @@ TODO: GIF or video of GCompris a few seconds from closing, emphasizing:
 * Automatic close at end of time
 * Icon deliberately missing afterwards -- cooldown
 
-### "access to any application that can be run, emulated, or virtualized"
+### Anything on Linux
+
+If it can run on Linux in *any way, shape, or form*, it can be supervised by
+`shepherd-launcher`.
 
 TODO: show the following running with some subset of the above features highlighted:
-* Minecraft
-* Steam games (World of Goo, Portal 2)
+* Media (Big Buck Bunny locally, YouTube via `mpv`)
 * ScummVM games (Putt Putt, Secret of Monkey Island)
-* Media
+* Minecraft
+* Steam games (Celeste, A Short Hike)
 
 Contributions are welcome for improvements and not yet implemented backends,
 such as:
@@ -44,6 +54,13 @@ such as:
 * Android apps via Waydroid, including pre-booting Android if necessary [TODO: link to issue]
 * Legacy Win9x via DOSBox, QEMU, or PCem, including scripts to create a boot-to-app image [TODO: link to issue]
 * Chrome, including strict sandboxing and support for firewall rules [TODO: link to issue]
+* Awareness of whether an Internet connection is available, and an availability
+  rule that gates activities based on this [TODO: link to issue]
+* Porting to other *host* platforms, such as a Microsoft Windows shell
+  replacement or macOS kiosk via MDM. `shepherd-launcher` is architected such
+  that `shepherdd`, the core enforcement service, does not render any UI and
+  performs platform-specific functions like process management in
+  platform-specific crates.
 
 ## Core concepts
 
@@ -136,4 +153,4 @@ compatibility infrastructure:
 
 This project was written with the assistance of generative AI-based coding
 agents. Substantial prompts and design docs provided to agents are disclosed in
-[docs/ai](./docs/ai/)
+[docs/ai](./docs/ai/).

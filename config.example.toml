@@ -69,7 +69,7 @@ end = "20:00"
 # This requires ScummVM to be installed (Ubuntu: `sudo apt install scummvm`).
 # You must install the game files from your copy of the game into ScummVM first.
 # See https://docs.scummvm.org/en/v2.9.1/use_scummvm/game_files.html for how to do this.
-# If you do not have the game files, you can run via Steam instead (see below).
+# If you do not have the game files, you can purchase and run via Steam instead (see below).
 # https://store.steampowered.com/app/294690/PuttPutt_Joins_the_Circus/
 [[entries]]
 id = "scummvm-putt-putt"
@@ -95,7 +95,7 @@ end = "20:00"
 # Secret of Monkey Island via ScummVM
 # Like above, but with the following caveats:
 # * I have only tested this with the original CD-ROM version of the game.
-# * The GOG version at https://www.gog.com/en/game/the_secret_of_monkey_island_special_edition uses a different engine.
+# * The GOG version available for purchase at https://www.gog.com/en/game/the_secret_of_monkey_island_special_edition uses a different engine.
 # * It does *not* contain ScummVM-compatible data files, so this entry will not work with that version.
 # * It may be possible to extract compatible files from the GOG installer or run it via WINE, but that is outside the scope of this example.
 # * See https://www.gratissaugen.de/ultimatetalkies/ for how to do this.
@@ -209,17 +209,17 @@ max_volume = 60  # Limit volume during gaming sessions
 # Steam must be set up and logged in before using these entries.
 # You must have the games installed in your Steam library.
 
-# Human Resource Machine
-# https://store.steampowered.com/app/375820/Human_Resource_Machine
+# Celeste via Steam
+# https://store.steampowered.com/app/504230/Celeste
 [[entries]]
-id = "steam-human-resource-machine"
-label = "Human Resource Machine"
-icon = "steam"
+id = "steam-celeste"
+label = "Celeste"
+icon = "~/Games/Icons/Celeste.png"
 
 [entries.kind]
 type = "snap"
 snap_name = "steam"
-args = ["steam://rungameid/375820"]  # Steam App ID (passed to 'snap run steam')
+args = ["steam://rungameid/504230"]  # Steam App ID (passed to 'snap run steam')
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -235,9 +235,56 @@ end = "20:00"
 # No [entries.limits] section - uses service defaults
 # Omitting limits entirely uses default_max_run_seconds
 
+# A Short Hike via Steam
+# https://store.steampowered.com/app/1055540/A_Short_Hike/
+[[entries]]
+id = "steam-a-short-hike"
+label = "A Short Hike"
+icon = "~/Games/Icons/A_Short_Hike.png"
+
+[entries.kind]
+type = "snap"
+snap_name = "steam"
+args = ["steam://rungameid/1055540"]  # Steam App ID (passed to 'snap run steam')
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
 ## === Media ===
 # Just use `mpv` to play media (for now).
 # Files can be local on your system or URLs (YouTube, etc).
+
+# "Big Buck Bunny" saved on local disk
+# Available for free as CC BY 3.0 at https://peach.blender.org/download/
+[[entries]]
+id = "big-buck-bunny"
+label = "Big Buck Bunny"
+icon = "mpv"
+
+[entries.kind]
+type = "process"  # TODO: change to "media" type once supported
+command = "mpv"
+args = ["~/Videos/big_buck_bunny_720p_h264.mov"]  # Local file path
+
+[entries.availability]
+
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
 
 # "lofi hip hop radio 📚 beats to relax/study to" streamed live from YouTube
 [[entries]]
