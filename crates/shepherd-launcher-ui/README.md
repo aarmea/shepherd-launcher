@@ -49,14 +49,14 @@ This is what users see when no session is active—the "home screen" of the envi
 shepherd-launcher
 
 # With custom socket path
-shepherd-launcher --socket /run/shepherdd/shepherdd.sock
+shepherd-launcher --socket /custom/path/shepherdd.sock
 ```
 
 ### Command-Line Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-s, --socket` | `/run/shepherdd/shepherdd.sock` | Service socket path |
+| `-s, --socket` | `$XDG_RUNTIME_DIR/shepherdd/shepherdd.sock` | Service socket path |
 | `-l, --log-level` | `info` | Log verbosity |
 
 ## Grid Behavior

@@ -11,6 +11,7 @@ mod tile;
 
 use anyhow::Result;
 use clap::Parser;
+use shepherd_util::default_socket_path;
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
@@ -20,8 +21,8 @@ use tracing_subscriber::EnvFilter;
 #[command(about = "GTK4 launcher UI for shepherdd", long_about = None)]
 struct Args {
     /// Socket path for shepherdd connection (or set SHEPHERD_SOCKET env var)
-    #[arg(short, long, env = "SHEPHERD_SOCKET", default_value = "/run/shepherdd/shepherdd.sock")]
-    socket: PathBuf,
+    #[arg(short, long, env = "SHEPHERD_SOCKET")]
+    socket: Option<PathBuf>,
 
     /// Log level
     #[arg(short, long, default_value = "info")]
@@ -41,8 +42,11 @@ fn main() -> Result<()> {
 
     tracing::info!("Starting Shepherd Launcher UI");
 
+    // Determine socket path with fallback to default
+    let socket_path = args.socket.unwrap_or_else(default_socket_path);
+
     // Run GTK application
-    let application = app::LauncherApp::new(args.socket);
+    let application = app::LauncherApp::new(socket_path);
     let exit_code = application.run();
 
     std::process::exit(exit_code);

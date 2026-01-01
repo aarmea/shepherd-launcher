@@ -11,6 +11,7 @@ use gtk4::prelude::*;
 use gtk4_layer_shell::{Edge, Layer, LayerShell};
 use shepherd_api::Command;
 use shepherd_ipc::IpcClient;
+use shepherd_util::default_socket_path;
 use std::path::PathBuf;
 use std::sync::mpsc;
 use std::time::Duration;
@@ -329,12 +330,11 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         if let Some(session_id) = session_state.session_id() {
             tracing::info!("Requesting end session for {}", session_id);
             // Send StopCurrent command to shepherdd
-            let socket_path = std::env::var("SHEPHERD_SOCKET")
-                .unwrap_or_else(|_| "./dev-runtime/shepherd.sock".to_string());
+            let socket_path = default_socket_path();
             std::thread::spawn(move || {
                 let rt = Runtime::new().expect("Failed to create runtime");
                 rt.block_on(async {
-                    match IpcClient::connect(std::path::PathBuf::from(&socket_path)).await {
+                    match IpcClient::connect(&socket_path).await {
                         Ok(mut client) => {
                             let cmd = Command::StopCurrent {
                                 mode: shepherd_api::StopMode::Graceful,

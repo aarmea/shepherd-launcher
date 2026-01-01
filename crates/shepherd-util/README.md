@@ -10,6 +10,7 @@ This crate provides common utilities and types used across all Shepherd crates, 
 - **Time utilities** - Monotonic time handling and duration helpers
 - **Error types** - Common error definitions
 - **Rate limiting** - Helpers for command rate limiting
+- **Default paths** - XDG-compliant default paths for socket, data, and log directories
 
 ## Purpose
 
@@ -55,6 +56,19 @@ if limiter.check(&client_id) {
     // Process command
 }
 ```
+
+### Default Paths
+
+```rust
+use shepherd_util::{default_socket_path, default_data_dir, default_log_dir};
+
+// Get XDG-compliant paths (no root required)
+let socket = default_socket_path();  // $XDG_RUNTIME_DIR/shepherdd/shepherdd.sock
+let data = default_data_dir();       // $XDG_DATA_HOME/shepherdd or ~/.local/share/shepherdd
+let logs = default_log_dir();        // $XDG_STATE_HOME/shepherdd or ~/.local/state/shepherdd
+```
+
+Environment variables `SHEPHERD_SOCKET` and `SHEPHERD_DATA_DIR` can override the defaults.
 
 ## Design Philosophy
 

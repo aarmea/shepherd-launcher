@@ -5,19 +5,12 @@
 
 use shepherd_api::{Command, ResponsePayload, VolumeInfo};
 use shepherd_ipc::IpcClient;
-use std::path::PathBuf;
+use shepherd_util::default_socket_path;
 use tokio::runtime::Runtime;
-
-/// Get the default socket path from environment or fallback
-fn get_socket_path() -> PathBuf {
-    std::env::var("SHEPHERD_SOCKET")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("./dev-runtime/shepherd.sock"))
-}
 
 /// Get current volume status from shepherdd
 pub fn get_volume_status() -> Option<VolumeInfo> {
-    let socket_path = get_socket_path();
+    let socket_path = default_socket_path();
 
     let rt = match Runtime::new() {
         Ok(rt) => rt,
@@ -54,7 +47,7 @@ pub fn get_volume_status() -> Option<VolumeInfo> {
 
 /// Toggle mute state via shepherdd
 pub fn toggle_mute() -> anyhow::Result<()> {
-    let socket_path = get_socket_path();
+    let socket_path = default_socket_path();
 
     let rt = Runtime::new()?;
 
@@ -77,7 +70,7 @@ pub fn toggle_mute() -> anyhow::Result<()> {
 
 /// Set volume to a specific percentage via shepherdd
 pub fn set_volume(percent: u8) -> anyhow::Result<()> {
-    let socket_path = get_socket_path();
+    let socket_path = default_socket_path();
 
     let rt = Runtime::new()?;
 

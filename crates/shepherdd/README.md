@@ -74,8 +74,8 @@ shepherdd --log-level debug
 
 | Variable | Description |
 |----------|-------------|
-| `SHEPHERD_SOCKET` | Override socket path |
-| `SHEPHERD_DATA_DIR` | Override data directory |
+| `SHEPHERD_SOCKET` | Override socket path (default: `$XDG_RUNTIME_DIR/shepherdd/shepherdd.sock`) |
+| `SHEPHERD_DATA_DIR` | Override data directory (default: `$XDG_DATA_HOME/shepherdd`) |
 | `RUST_LOG` | Tracing filter (e.g., `shepherdd=debug`) |
 
 ## Main Loop

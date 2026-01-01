@@ -3,7 +3,7 @@
 use crate::schema::{RawConfig, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
-use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock};
+use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock, default_data_dir, default_log_dir, socket_path_without_env};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -84,13 +84,13 @@ impl ServiceConfig {
         Self {
             socket_path: raw
                 .socket_path
-                .unwrap_or_else(|| PathBuf::from("/run/shepherdd/shepherdd.sock")),
+                .unwrap_or_else(socket_path_without_env),
             log_dir: raw
                 .log_dir
-                .unwrap_or_else(|| PathBuf::from("/var/log/shepherdd")),
+                .unwrap_or_else(default_log_dir),
             data_dir: raw
                 .data_dir
-                .unwrap_or_else(|| PathBuf::from("/var/lib/shepherdd")),
+                .unwrap_or_else(default_data_dir),
         }
     }
 }
@@ -98,9 +98,9 @@ impl ServiceConfig {
 impl Default for ServiceConfig {
     fn default() -> Self {
         Self {
-            socket_path: PathBuf::from("/run/shepherdd/shepherdd.sock"),
-            log_dir: PathBuf::from("/var/log/shepherdd"),
-            data_dir: PathBuf::from("/var/lib/shepherdd"),
+            socket_path: socket_path_without_env(),
+            log_dir: default_log_dir(),
+            data_dir: default_data_dir(),
         }
     }
 }

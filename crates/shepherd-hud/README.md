@@ -56,7 +56,7 @@ shepherd-hud --anchor top --height 48
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-s, --socket` | `/run/shepherdd/shepherdd.sock` | Service socket path |
+| `-s, --socket` | `$XDG_RUNTIME_DIR/shepherdd/shepherdd.sock` | Service socket path |
 | `-l, --log-level` | `info` | Log verbosity |
 | `-a, --anchor` | `top` | Screen edge (`top` or `bottom`) |
 | `--height` | `48` | HUD bar height in pixels |

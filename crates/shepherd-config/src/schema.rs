@@ -22,13 +22,13 @@ pub struct RawConfig {
 /// Service-level settings
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct RawServiceConfig {
-    /// IPC socket path (default: /run/shepherdd/shepherdd.sock)
+    /// IPC socket path (default: $XDG_RUNTIME_DIR/shepherdd/shepherdd.sock)
     pub socket_path: Option<PathBuf>,
 
-    /// Log directory
+    /// Log directory (default: $XDG_STATE_HOME/shepherdd)
     pub log_dir: Option<PathBuf>,
 
-    /// Data directory for store
+    /// Data directory for store (default: $XDG_DATA_HOME/shepherdd)
     pub data_dir: Option<PathBuf>,
 
     /// Default warning thresholds (can be overridden per entry)

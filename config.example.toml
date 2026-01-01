@@ -4,10 +4,13 @@
 config_version = 1
 
 [service]
-# Uncomment to customize paths
-# socket_path = "/run/shepherdd/shepherdd.sock"
-# log_dir = "/var/log/shepherdd"
-# data_dir = "/var/lib/shepherdd"
+# Uncomment to customize paths (defaults use XDG directories for user-writable access)
+# socket_path defaults to $XDG_RUNTIME_DIR/shepherdd/shepherdd.sock
+# log_dir defaults to $XDG_STATE_HOME/shepherdd or ~/.local/state/shepherdd
+# data_dir defaults to $XDG_DATA_HOME/shepherdd or ~/.local/share/shepherdd
+# socket_path = "/run/user/1000/shepherdd/shepherdd.sock"
+# log_dir = "~/.local/state/shepherdd"
+# data_dir = "~/.local/share/shepherdd"
 
 # Default max run duration if not specified per entry (1 hour)
 # Set to 0 for unlimited (no time limit)
