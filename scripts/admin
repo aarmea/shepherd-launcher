@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Admin wrapper - convenience script for administrative tasks
+# Provides quick access to install and harden commands
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+usage() {
+    cat <<EOF
+admin - Administrative wrapper for shepherd
+
+Usage: admin <command> [options]
+
+This is a convenience wrapper. All commands are equivalent to:
+    shepherd install ...
+    shepherd harden ...
+
+Commands:
+    install <subcommand>    Install shepherd components
+    harden <subcommand>     Manage user hardening
+
+Examples:
+    admin install all --user kiosk
+    admin harden apply --user kiosk
+    admin harden revert --user kiosk
+
+Run 'shepherd install help' or 'shepherd harden help' for details.
+EOF
+}
+
+case "${1:-}" in
+    install|harden)
+        exec "$SCRIPT_DIR/shepherd" "$@"
+        ;;
+    -h|--help|help|"")
+        usage
+        ;;
+    *)
+        echo "Unknown command: $1" >&2
+        echo "Run 'admin help' for usage." >&2
+        exit 1
+        ;;
+esac

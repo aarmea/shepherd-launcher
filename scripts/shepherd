@@ -1,0 +1,128 @@
+#!/usr/bin/env bash
+# Shepherd CLI - Main entrypoint for shepherd-launcher tooling
+# Provides unified interface for build, development, installation, and hardening
+
+set -euo pipefail
+
+# Get the directory containing this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$SCRIPT_DIR/lib"
+
+# Source shared libraries
+# shellcheck source=lib/common.sh
+source "$LIB_DIR/common.sh"
+# shellcheck source=lib/deps.sh
+source "$LIB_DIR/deps.sh"
+# shellcheck source=lib/build.sh
+source "$LIB_DIR/build.sh"
+# shellcheck source=lib/sway.sh
+source "$LIB_DIR/sway.sh"
+# shellcheck source=lib/install.sh
+source "$LIB_DIR/install.sh"
+# shellcheck source=lib/harden.sh
+source "$LIB_DIR/harden.sh"
+
+# Version
+VERSION="0.1.0"
+
+# Print usage information
+usage() {
+    cat <<EOF
+shepherd - Unified tooling for shepherd-launcher
+
+Usage: shepherd <command> [subcommand] [options]
+
+Commands:
+    deps        Manage system dependencies
+    build       Build shepherd binaries
+    dev         Development commands
+    install     Install shepherd to the system
+    harden      User hardening for kiosk mode
+
+Development:
+    shepherd deps install dev     Install all development dependencies
+    shepherd build                Build debug binaries
+    shepherd dev run              Build and run in nested sway
+
+CI/Build:
+    shepherd deps install build   Install build-only dependencies
+    shepherd build --release      Build release binaries
+
+Runtime:
+    shepherd deps install run     Install runtime dependencies only
+
+Installation:
+    shepherd install all --user USER          Full installation
+    shepherd install bins --prefix /usr       Install binaries only
+    shepherd install config --user USER       Deploy user config
+
+Hardening:
+    shepherd harden apply --user USER         Apply kiosk restrictions
+    shepherd harden revert --user USER        Remove restrictions
+
+Options:
+    -h, --help      Show this help message
+    -V, --version   Show version
+
+Run 'shepherd <command> help' for detailed command information.
+EOF
+}
+
+# Main entry point
+main() {
+    local cmd="${1:-}"
+    shift || true
+
+    case "$cmd" in
+        deps)
+            deps_main "$@"
+            ;;
+        build)
+            build_main "$@"
+            ;;
+        dev)
+            local subcmd="${1:-}"
+            shift || true
+            case "$subcmd" in
+                run)
+                    sway_dev_run "$@"
+                    ;;
+                ""|help|-h|--help)
+                    cat <<EOF
+Usage: shepherd dev <command>
+
+Commands:
+    run    Build and run shepherd in a nested sway session
+
+Examples:
+    shepherd dev run
+EOF
+                    ;;
+                *)
+                    die "Unknown dev command: $subcmd (try: shepherd dev help)"
+                    ;;
+            esac
+            ;;
+        install)
+            install_main "$@"
+            ;;
+        harden)
+            harden_main "$@"
+            ;;
+        -h|--help|help|"")
+            usage
+            ;;
+        -V|--version|version)
+            echo "shepherd $VERSION"
+            ;;
+        *)
+            error "Unknown command: $cmd"
+            echo ""
+            usage
+            exit 1
+            ;;
+    esac
+}
+
+# Run main with all arguments
+main "$@"

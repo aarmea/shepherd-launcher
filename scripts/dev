@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Development wrapper - thin convenience script for developers
+# Equivalent to: shepherd dev run
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "$SCRIPT_DIR/shepherd" dev run "$@"

@@ -4,7 +4,8 @@
 
 ### tl;dr
 
-You need a Wayland-capable Linux system, Rust, and a small set of system dependencies. Once installed, `./run-dev` will start a development instance.
+You need a Wayland-capable Linux system, Rust, and a small set of system
+dependencies. Once installed, `./run-dev` will start a development instance.
 
 ### Requirements
 
@@ -15,14 +16,40 @@ You need a Wayland-capable Linux system, Rust, and a small set of system depende
 
 2. **System dependencies**
 
-   * Platform-specific packages are required.
-   * For Ubuntu, see the [`SYSTEM_DEPS` section in the CI configuration](./.github/workflows/ci.yml).
+   * Platform-specific packages are required for building and running.
+   * View packages with: `./scripts/shepherd deps print dev`
+   * Install all dev dependencies: `./scripts/shepherd deps install dev`
+   * **Note**: Rust is automatically installed via rustup when installing build or dev dependencies.
 
-3. **Rust toolchain**
+### Unified script system
 
-   ```sh
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
+`shepherd-launcher` provides a unified script system for managing dependencies, building, and running:
+
+```sh
+# View and install dependencies
+./scripts/shepherd deps print dev        # List all dev dependencies
+./scripts/shepherd deps install dev      # Install all dev dependencies
+
+# Build binaries
+./scripts/shepherd build                 # Debug build
+./scripts/shepherd build --release       # Release build
+
+# Development
+./scripts/shepherd dev run               # Build and run in nested Sway
+```
+
+For CI/build-only environments:
+```sh
+./scripts/shepherd deps install build    # Build dependencies only
+./scripts/shepherd build --release       # Production build
+```
+
+For runtime-only systems:
+```sh
+./scripts/shepherd deps install run      # Runtime dependencies only
+```
+
+See `./scripts/shepherd --help` for all available commands.
 
 ### Running in development
 

@@ -74,29 +74,6 @@ If it can run on Linux in *any way, shape, or form*, it can be supervised by
 
 > [A Short Hike](https://ashorthike.com/) running via Steam
 
-Contributions are welcome for improvements and not yet implemented backends,
-such as:
-* Content-aware media player with supervised libraries
-  ([#3](https://github.com/aarmea/shepherd-launcher/issues/3))
-* Pre-booted Steam to improve launch time
-  ([#4](https://github.com/aarmea/shepherd-launcher/issues/4))
-* Android apps via Waydroid, including pre-booting Android if necessary
-  ([#5](https://github.com/aarmea/shepherd-launcher/issues/5))
-* Legacy Win9x via DOSBox, QEMU, or PCem, including scripts to create a boot-to-app image
-  ([#6](https://github.com/aarmea/shepherd-launcher/issues/6))
-* Chrome
-  ([#7](https://github.com/aarmea/shepherd-launcher/issues/7)),
-  including strict sandboxing and support for firewall rules
-  ([#8](https://github.com/aarmea/shepherd-launcher/issues/8))
-* Awareness of whether an Internet connection is available, and an availability
-  rule that gates activities based on this
-  ([#9](https://github.com/aarmea/shepherd-launcher/issues/9))
-* Porting to other *host* platforms, such as a Microsoft Windows shell
-  replacement or macOS kiosk via MDM. `shepherd-launcher` is architected such
-  that `shepherdd`, the core enforcement service, does not render any UI and
-  performs platform-specific functions like process management in
-  platform-specific crates.
-
 ## Core concepts
 
 * **Launcher-first**: only one foreground activity at a time
@@ -113,16 +90,12 @@ such as:
 
 ## Installation
 
-`shepherd-launcher` is pre-alpha and in active development. As such, end-user
-binaries and installation instructions are not yet available.
+`shepherd-launcher` is pre-alpha and in active development. The helper at
+`./scripts/shepherd` can be used to build and install a *fully functional*
+local kiosk setup from source:
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for how to run in development.
-
-Contributions are welcome for:
-* a CI step that generates production binaries
-  ([#1](https://github.com/aarmea/shepherd-launcher/issues/1))
-* an installation script
-  ([#2](https://github.com/aarmea/shepherd-launcher/issues/2))
+Check out this repository and run `./scripts/shepherd --help` or see
+[INSTALL.md](./docs/INSTALL.md) for more.
 
 ## Example configuration
 
@@ -159,11 +132,6 @@ daily_quota_seconds = 3600  # 1 hour per day
 cooldown_seconds = 600  # 10 minute cooldown
 
 [[entries.warnings]]
-seconds_before = 600
-severity = "info"
-message = "10 minutes left - start wrapping up!"
-
-[[entries.warnings]]
 seconds_before = 120
 severity = "warn"
 message = "2 minutes remaining - save your game!"
@@ -178,7 +146,12 @@ See [config.example.toml](./config.example.toml) for more.
 
 ## Development
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md)
+Build instructions and contribution guidelines are described in
+[CONTRIBUTING.md](./CONTRIBUTING.md).
+
+If you'd like to help out, look on
+[GitHub Issues](https://github.com/aarmea/shepherd-launcher/issues) for
+potential work items.
 
 ## Written in 2025, responsibly
 
