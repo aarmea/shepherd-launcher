@@ -1,0 +1,28 @@
+# Build-time system packages for shepherd-launcher
+# These are required to compile the Rust code
+# One package per line, comments start with #
+
+# Core build tools
+build-essential
+pkg-config
+
+# GLib/GTK development libraries
+libglib2.0-dev
+libgtk-4-dev
+libadwaita-1-dev
+libcairo2-dev
+libpango1.0-dev
+libgdk-pixbuf-xlib-2.0-dev
+
+# Wayland development libraries
+libwayland-dev
+libxkbcommon-dev
+
+# X11 (for XWayland support)
+libx11-dev
+
+# GObject introspection
+libgirepository1.0-dev
+
+# Layer shell for HUD overlay
+libgtk4-layer-shell-dev

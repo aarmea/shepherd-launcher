@@ -1,0 +1,14 @@
+# Runtime system packages for shepherd-launcher
+# These are required to run the compiled binaries
+# One package per line, comments start with #
+
+# Sway compositor (required for kiosk mode)
+sway
+
+# Wayland session utilities
+swayidle
+
+# Runtime libraries (may be pulled in automatically, but explicit is safer)
+libgtk-4-1
+libadwaita-1-0
+libgtk4-layer-shell0

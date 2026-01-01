@@ -1,0 +1,11 @@
+# Developer-only packages for shepherd-launcher
+# These are extras useful during development
+# The full dev set is: build.pkgs + run.pkgs + dev.pkgs
+# One package per line, comments start with #
+
+# Git for version control
+git
+
+# Useful debugging tools
+strace
+gdb
