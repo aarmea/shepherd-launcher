@@ -31,9 +31,9 @@ sway_cleanup() {
     fi
     
     # Explicitly kill any shepherd processes that might have escaped
-    kill_matching "shepherdd"
-    kill_matching "shepherd-launcher"
-    kill_matching "shepherd-hud"
+    pkill -x "shepherdd" 2>/dev/null || true
+    pkill -x "shepherd-launcher" 2>/dev/null || true
+    pkill -x "shepherd-hud" 2>/dev/null || true
     
     # Remove socket
     if [[ -n "${SHEPHERD_SOCKET:-}" ]]; then
@@ -45,9 +45,9 @@ sway_cleanup() {
 sway_kill_existing() {
     info "Cleaning up any existing dev instances..."
     kill_matching "sway -c.*sway.conf"
-    kill_matching "shepherdd"
-    kill_matching "shepherd-launcher"
-    kill_matching "shepherd-hud"
+    pkill -x "shepherdd" 2>/dev/null || true
+    pkill -x "shepherd-launcher" 2>/dev/null || true
+    pkill -x "shepherd-hud" 2>/dev/null || true
     
     # Remove stale socket if it exists
     if [[ -n "${SHEPHERD_SOCKET:-}" ]] && [[ -e "$SHEPHERD_SOCKET" ]]; then
