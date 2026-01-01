@@ -26,3 +26,6 @@ libgirepository1.0-dev
 
 # Layer shell for HUD overlay
 libgtk4-layer-shell-dev
+
+# Required for rustup
+curl
