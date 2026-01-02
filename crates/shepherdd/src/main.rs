@@ -231,12 +231,10 @@ impl Service {
             let engine = engine.lock().await;
             if let Some(session) = engine.current_session() {
                 info!(session_id = %session.plan.session_id, "Stopping active session");
-                if let Some(handle) = &session.host_handle {
-                    if let Err(e) = host.stop(handle, HostStopMode::Graceful {
-                        timeout: Duration::from_secs(5),
-                    }).await {
-                        warn!(error = %e, "Failed to stop session gracefully");
-                    }
+                if let Some(handle) = &session.host_handle && let Err(e) = host.stop(handle, HostStopMode::Graceful {
+                    timeout: Duration::from_secs(5),
+                }).await {
+                    warn!(error = %e, "Failed to stop session gracefully");
                 }
             }
         }
