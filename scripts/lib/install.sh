@@ -159,12 +159,16 @@ install_config() {
     maybe_sudo chown "$user:$user" "$user_config_dir"
     maybe_sudo chmod 0755 "$user_config_dir"
     
-    # Copy config file
-    maybe_sudo cp "$source_config" "$dst_config"
-    maybe_sudo chown "$user:$user" "$dst_config"
-    maybe_sudo chmod 0644 "$dst_config"
-    
-    success "Installed user configuration for $user"
+    # Check if config already exists
+    if maybe_sudo test -f "$dst_config"; then
+        warn "Config file already exists at $dst_config, skipping"
+    else
+        # Copy config file
+        maybe_sudo cp "$source_config" "$dst_config"
+        maybe_sudo chown "$user:$user" "$dst_config"
+        maybe_sudo chmod 0644 "$dst_config"
+        success "Installed user configuration for $user"
+    fi
 }
 
 # Install everything
