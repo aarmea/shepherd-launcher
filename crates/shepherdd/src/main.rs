@@ -25,6 +25,7 @@ use shepherd_util::{ClientId, MonotonicInstant, RateLimiter};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -163,6 +164,14 @@ impl Service {
             }
         });
 
+        // Set up signal handlers
+        let mut sigterm = signal(SignalKind::terminate())
+            .context("Failed to create SIGTERM handler")?;
+        let mut sigint = signal(SignalKind::interrupt())
+            .context("Failed to create SIGINT handler")?;
+        let mut sighup = signal(SignalKind::hangup())
+            .context("Failed to create SIGHUP handler")?;
+
         // Main event loop
         let tick_interval = Duration::from_millis(100);
         let mut tick_timer = tokio::time::interval(tick_interval);
@@ -171,6 +180,22 @@ impl Service {
 
         loop {
             tokio::select! {
+                // Signal: SIGTERM or SIGINT - graceful shutdown
+                _ = sigterm.recv() => {
+                    info!("Received SIGTERM, shutting down gracefully");
+                    break;
+                }
+                _ = sigint.recv() => {
+                    info!("Received SIGINT, shutting down gracefully");
+                    break;
+                }
+
+                // Signal: SIGHUP - graceful shutdown (sent by sway on exit)
+                _ = sighup.recv() => {
+                    info!("Received SIGHUP, shutting down gracefully");
+                    break;
+                }
+
                 // Tick timer - check warnings and expiry
                 _ = tick_timer.tick() => {
                     let now_mono = MonotonicInstant::now();
@@ -197,6 +222,32 @@ impl Service {
                 }
             }
         }
+
+        // Graceful shutdown
+        info!("Shutting down shepherdd");
+
+        // Stop all running sessions
+        {
+            let engine = engine.lock().await;
+            if let Some(session) = engine.current_session() {
+                info!(session_id = %session.plan.session_id, "Stopping active session");
+                if let Some(handle) = &session.host_handle {
+                    if let Err(e) = host.stop(handle, HostStopMode::Graceful {
+                        timeout: Duration::from_secs(5),
+                    }).await {
+                        warn!(error = %e, "Failed to stop session gracefully");
+                    }
+                }
+            }
+        }
+
+        // Log shutdown
+        if let Err(e) = store.append_audit(AuditEvent::new(AuditEventType::ServiceStopped)) {
+            warn!(error = %e, "Failed to log service shutdown");
+        }
+
+        info!("Shutdown complete");
+        Ok(())
     }
 
     async fn handle_core_event(
