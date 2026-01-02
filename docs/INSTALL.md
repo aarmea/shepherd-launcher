@@ -26,7 +26,6 @@ This installs:
 - Binaries to `/usr/local/bin/`
 - System Sway configuration to `/etc/sway/shepherd.conf`
 - Display manager desktop entry ("Shepherd Kiosk" session)
-- System config template to `/etc/shepherd/config.toml`
 - User config to `~kiosk/.config/shepherd/config.toml`
 
 For custom installation paths:

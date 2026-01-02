@@ -86,7 +86,7 @@ install_sway_config() {
         -e "s|./target/debug/shepherd-launcher|$bindir/shepherd-launcher|g" \
         -e "s|./target/debug/shepherd-hud|$bindir/shepherd-hud|g" \
         -e "s|./target/debug/shepherdd|$bindir/shepherdd|g" \
-        -e "s|./config.example.toml|/etc/shepherd/config.toml|g" \
+        -e "s|./config.example.toml|~/.config/shepherd/config.toml|g" \
         -e "s|-c ./sway.conf|-c $dst_config|g" \
         "$src_config" > "$dst_config"
     
@@ -167,34 +167,6 @@ install_config() {
     success "Installed user configuration for $user"
 }
 
-# Install the system-wide shepherd config directory
-install_system_config() {
-    local destdir="${DESTDIR:-}"
-    local repo_root
-    repo_root="$(get_repo_root)"
-    
-    require_root
-    
-    local src_config="$repo_root/config.example.toml"
-    local dst_dir="$destdir/etc/shepherd"
-    local dst_config="$dst_dir/config.toml"
-    
-    if [[ ! -f "$src_config" ]]; then
-        die "Source config not found: $src_config"
-    fi
-    
-    info "Installing system config to $dst_config..."
-    
-    ensure_dir "$dst_dir" 0755
-    
-    if [[ ! -f "$dst_config" ]]; then
-        install -m 0644 "$src_config" "$dst_config"
-        success "Installed system configuration"
-    else
-        info "System configuration already exists, not overwriting"
-    fi
-}
-
 # Install everything
 install_all() {
     local user="${1:-}"
@@ -211,17 +183,15 @@ install_all() {
     
     install_bins "$prefix"
     install_sway_config "$prefix"
-    install_system_config
     install_desktop_entry "$prefix"
     install_config "$user"
     
     success "Installation complete!"
     info ""
     info "Next steps:"
-    info "  1. Edit /etc/shepherd/config.toml for your system"
-    info "  2. Edit user config at ~$user/.config/shepherd/config.toml"
-    info "  3. Select 'Shepherd Kiosk' session at login"
-    info "  4. Optionally run 'shepherd harden apply --user $user' for kiosk mode"
+    info "  1. Edit user config at ~$user/.config/shepherd/config.toml"
+    info "  2. Select 'Shepherd Kiosk' session at login"
+    info "  3. Optionally run 'shepherd harden apply --user $user' for kiosk mode"
 }
 
 # Main install command dispatcher
@@ -267,9 +237,6 @@ install_main() {
         desktop-entry)
             install_desktop_entry "$prefix"
             ;;
-        system-config)
-            install_system_config
-            ;;
         all)
             install_all "$user" "$prefix"
             ;;
@@ -282,7 +249,6 @@ Commands:
     config            Deploy user configuration
     sway-config       Install sway configuration
     desktop-entry     Install display manager desktop entry
-    system-config     Install system-wide configuration
     all               Install everything
 
 Options:
