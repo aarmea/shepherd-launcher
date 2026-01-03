@@ -191,7 +191,7 @@ impl HostAdapter for LinuxHost {
             &argv,
             &env,
             cwd.as_ref(),
-            options.capture_stdout || options.capture_stderr,
+            options.log_path.clone(),
             snap_name.clone(),
         )?;
 

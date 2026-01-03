@@ -12,6 +12,12 @@ config_version = 1
 # log_dir = "~/.local/state/shepherdd"
 # data_dir = "~/.local/share/shepherdd"
 
+# Capture stdout/stderr from child applications to log files
+# Logs are written to child_log_dir (or log_dir/sessions if not set)` to view logs.
+# File format: <entry_id>_<timestamp>.log
+# capture_child_output = true
+# child_log_dir = "~/.local/state/shepherdd/sessions"
+
 # Default max run duration if not specified per entry (1 hour)
 # Set to 0 for unlimited (no time limit)
 default_max_run_seconds = 3600

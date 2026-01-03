@@ -3,7 +3,9 @@
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::collections::HashMap;
+use std::fs::File;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use tracing::{debug, info, warn};
 
@@ -126,11 +128,13 @@ impl ManagedProcess {
     /// 
     /// If `snap_name` is provided, the process is treated as a snap app and will use
     /// systemd scope-based killing instead of signal-based killing.
+    /// 
+    /// If `log_path` is provided, stdout and stderr will be redirected to that file.
     pub fn spawn(
         argv: &[String],
         env: &HashMap<String, String>,
         cwd: Option<&std::path::PathBuf>,
-        capture_output: bool,
+        log_path: Option<PathBuf>,
         snap_name: Option<String>,
     ) -> HostResult<Self> {
         if argv.is_empty() {
@@ -243,11 +247,42 @@ impl ManagedProcess {
             cmd.current_dir(dir);
         }
 
-        // Configure output capture
-        // For debugging, inherit stdout/stderr so we can see errors
-        if capture_output {
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
+        // Configure output handling
+        // If log_path is provided, redirect stdout/stderr to the log file
+        // Otherwise, inherit from parent so we can see child output for debugging
+        if let Some(ref path) = log_path {
+            // Create parent directory if it doesn't exist
+            if let Some(parent) = path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                warn!(path = %parent.display(), error = %e, "Failed to create log directory");
+            }
+            
+            // Open log file for appending (create if doesn't exist)
+            match File::create(path) {
+                Ok(file) => {
+                    // Clone file handle for stderr (both point to same file)
+                    let stderr_file = match file.try_clone() {
+                        Ok(f) => f,
+                        Err(e) => {
+                            warn!(path = %path.display(), error = %e, "Failed to clone log file handle");
+                            cmd.stdout(Stdio::inherit());
+                            cmd.stderr(Stdio::inherit());
+                            cmd.stdin(Stdio::null());
+                            // Skip to spawn
+                            return Self::spawn_with_cmd(cmd, program, snap_name);
+                        }
+                    };
+                    cmd.stdout(Stdio::from(file));
+                    cmd.stderr(Stdio::from(stderr_file));
+                    info!(path = %path.display(), "Redirecting child output to log file");
+                }
+                Err(e) => {
+                    warn!(path = %path.display(), error = %e, "Failed to open log file, inheriting output");
+                    cmd.stdout(Stdio::inherit());
+                    cmd.stderr(Stdio::inherit());
+                }
+            }
         } else {
             // Inherit from parent so we can see child output for debugging
             cmd.stdout(Stdio::inherit());
@@ -256,6 +291,15 @@ impl ManagedProcess {
 
         cmd.stdin(Stdio::null());
 
+        Self::spawn_with_cmd(cmd, program, snap_name)
+    }
+
+    /// Complete the spawn process with the configured command
+    fn spawn_with_cmd(
+        mut cmd: Command,
+        program: &str,
+        snap_name: Option<String>,
+    ) -> HostResult<Self> {
         // Store the command name for later use in killing
         let command_name = program.to_string();
 
@@ -467,7 +511,7 @@ mod tests {
         let argv = vec!["true".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
 
         // Wait for it to complete
         let status = proc.wait().unwrap();
@@ -479,7 +523,7 @@ mod tests {
         let argv = vec!["echo".to_string(), "hello".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
         let status = proc.wait().unwrap();
         assert!(status.is_success());
     }
@@ -489,7 +533,7 @@ mod tests {
         let argv = vec!["sleep".to_string(), "60".to_string()];
         let env = HashMap::new();
 
-        let proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
 
         // Give it a moment to start
         std::thread::sleep(std::time::Duration::from_millis(50));
