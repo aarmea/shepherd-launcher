@@ -130,6 +130,8 @@ impl ManagedProcess {
     /// systemd scope-based killing instead of signal-based killing.
     /// 
     /// If `log_path` is provided, stdout and stderr will be redirected to that file.
+    /// For snap apps, we use `script` to capture output from all child processes
+    /// via a pseudo-terminal, since snap child processes don't inherit file descriptors.
     pub fn spawn(
         argv: &[String],
         env: &HashMap<String, String>,
@@ -141,8 +143,42 @@ impl ManagedProcess {
             return Err(HostError::SpawnFailed("Empty argv".into()));
         }
 
-        let program = &argv[0];
-        let args = &argv[1..];
+        // For snap apps with log capture, wrap with `script` to capture all child output
+        // via a pseudo-terminal. Snap child processes don't inherit file descriptors,
+        // but they do write to the controlling terminal.
+        let (actual_argv, actual_log_path) = match (&snap_name, &log_path) {
+            (Some(_), Some(log_file)) => {
+                // Create parent directory if it doesn't exist
+                if let Some(parent) = log_file.parent()
+                    && let Err(e) = std::fs::create_dir_all(parent)
+                {
+                    warn!(path = %parent.display(), error = %e, "Failed to create log directory");
+                }
+                
+                // Build command: script -q -c "original command" logfile
+                // -q: quiet mode (no start/done messages)
+                // -c: command to run
+                let original_cmd = argv.iter()
+                    .map(|arg| shell_escape::escape(std::borrow::Cow::Borrowed(arg)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                
+                let script_argv = vec![
+                    "script".to_string(),
+                    "-q".to_string(),
+                    "-c".to_string(),
+                    original_cmd,
+                    log_file.to_string_lossy().to_string(),
+                ];
+                
+                info!(log_path = %log_file.display(), "Using script to capture snap output via pty");
+                (script_argv, None) // script handles the log file itself
+            }
+            _ => (argv.to_vec(), log_path),
+        };
+
+        let program = &actual_argv[0];
+        let args = &actual_argv[1..];
 
         let mut cmd = Command::new(program);
         cmd.args(args);
@@ -248,9 +284,10 @@ impl ManagedProcess {
         }
 
         // Configure output handling
-        // If log_path is provided, redirect stdout/stderr to the log file
+        // If actual_log_path is provided, redirect stdout/stderr to the log file
+        // (For snap apps, we already wrapped with `script` which handles logging)
         // Otherwise, inherit from parent so we can see child output for debugging
-        if let Some(ref path) = log_path {
+        if let Some(ref path) = actual_log_path {
             // Create parent directory if it doesn't exist
             if let Some(parent) = path.parent()
                 && let Err(e) = std::fs::create_dir_all(parent)
