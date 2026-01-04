@@ -77,17 +77,28 @@ pub struct ServiceConfig {
     pub socket_path: PathBuf,
     pub log_dir: PathBuf,
     pub data_dir: PathBuf,
+    /// Whether to capture stdout/stderr from child applications
+    pub capture_child_output: bool,
+    /// Directory for child application logs
+    pub child_log_dir: PathBuf,
 }
 
 impl ServiceConfig {
     fn from_raw(raw: RawServiceConfig) -> Self {
+        let log_dir = raw
+            .log_dir
+            .clone()
+            .unwrap_or_else(default_log_dir);
+        let child_log_dir = raw
+            .child_log_dir
+            .unwrap_or_else(|| log_dir.join("sessions"));
         Self {
             socket_path: raw
                 .socket_path
                 .unwrap_or_else(socket_path_without_env),
-            log_dir: raw
-                .log_dir
-                .unwrap_or_else(default_log_dir),
+            log_dir,
+            capture_child_output: raw.capture_child_output,
+            child_log_dir,
             data_dir: raw
                 .data_dir
                 .unwrap_or_else(default_data_dir),
@@ -97,10 +108,13 @@ impl ServiceConfig {
 
 impl Default for ServiceConfig {
     fn default() -> Self {
+        let log_dir = default_log_dir();
         Self {
             socket_path: socket_path_without_env(),
-            log_dir: default_log_dir(),
+            child_log_dir: log_dir.join("sessions"),
+            log_dir,
             data_dir: default_data_dir(),
+            capture_child_output: false,
         }
     }
 }

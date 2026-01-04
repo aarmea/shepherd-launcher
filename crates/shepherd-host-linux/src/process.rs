@@ -3,7 +3,9 @@
 use nix::sys::signal::{self, Signal};
 use nix::unistd::Pid;
 use std::collections::HashMap;
+use std::fs::File;
 use std::os::unix::process::CommandExt;
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use tracing::{debug, info, warn};
 
@@ -126,19 +128,57 @@ impl ManagedProcess {
     /// 
     /// If `snap_name` is provided, the process is treated as a snap app and will use
     /// systemd scope-based killing instead of signal-based killing.
+    /// 
+    /// If `log_path` is provided, stdout and stderr will be redirected to that file.
+    /// For snap apps, we use `script` to capture output from all child processes
+    /// via a pseudo-terminal, since snap child processes don't inherit file descriptors.
     pub fn spawn(
         argv: &[String],
         env: &HashMap<String, String>,
         cwd: Option<&std::path::PathBuf>,
-        capture_output: bool,
+        log_path: Option<PathBuf>,
         snap_name: Option<String>,
     ) -> HostResult<Self> {
         if argv.is_empty() {
             return Err(HostError::SpawnFailed("Empty argv".into()));
         }
 
-        let program = &argv[0];
-        let args = &argv[1..];
+        // For snap apps with log capture, wrap with `script` to capture all child output
+        // via a pseudo-terminal. Snap child processes don't inherit file descriptors,
+        // but they do write to the controlling terminal.
+        let (actual_argv, actual_log_path) = match (&snap_name, &log_path) {
+            (Some(_), Some(log_file)) => {
+                // Create parent directory if it doesn't exist
+                if let Some(parent) = log_file.parent()
+                    && let Err(e) = std::fs::create_dir_all(parent)
+                {
+                    warn!(path = %parent.display(), error = %e, "Failed to create log directory");
+                }
+                
+                // Build command: script -q -c "original command" logfile
+                // -q: quiet mode (no start/done messages)
+                // -c: command to run
+                let original_cmd = argv.iter()
+                    .map(|arg| shell_escape::escape(std::borrow::Cow::Borrowed(arg)))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                
+                let script_argv = vec![
+                    "script".to_string(),
+                    "-q".to_string(),
+                    "-c".to_string(),
+                    original_cmd,
+                    log_file.to_string_lossy().to_string(),
+                ];
+                
+                info!(log_path = %log_file.display(), "Using script to capture snap output via pty");
+                (script_argv, None) // script handles the log file itself
+            }
+            _ => (argv.to_vec(), log_path),
+        };
+
+        let program = &actual_argv[0];
+        let args = &actual_argv[1..];
 
         let mut cmd = Command::new(program);
         cmd.args(args);
@@ -233,6 +273,9 @@ impl ManagedProcess {
             cmd.env("WAYLAND_DISPLAY", shepherd_display);
         }
 
+        // Chromium-based browsers and Electron apps need this to use the correct password store.
+        cmd.env("PASSWORD_STORE", "gnome");
+
         // Add custom environment (these can override inherited vars)
         for (k, v) in env {
             cmd.env(k, v);
@@ -243,11 +286,43 @@ impl ManagedProcess {
             cmd.current_dir(dir);
         }
 
-        // Configure output capture
-        // For debugging, inherit stdout/stderr so we can see errors
-        if capture_output {
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
+        // Configure output handling
+        // If actual_log_path is provided, redirect stdout/stderr to the log file
+        // (For snap apps, we already wrapped with `script` which handles logging)
+        // Otherwise, inherit from parent so we can see child output for debugging
+        if let Some(ref path) = actual_log_path {
+            // Create parent directory if it doesn't exist
+            if let Some(parent) = path.parent()
+                && let Err(e) = std::fs::create_dir_all(parent)
+            {
+                warn!(path = %parent.display(), error = %e, "Failed to create log directory");
+            }
+            
+            // Open log file for appending (create if doesn't exist)
+            match File::create(path) {
+                Ok(file) => {
+                    // Clone file handle for stderr (both point to same file)
+                    let stderr_file = match file.try_clone() {
+                        Ok(f) => f,
+                        Err(e) => {
+                            warn!(path = %path.display(), error = %e, "Failed to clone log file handle");
+                            cmd.stdout(Stdio::inherit());
+                            cmd.stderr(Stdio::inherit());
+                            cmd.stdin(Stdio::null());
+                            // Skip to spawn
+                            return Self::spawn_with_cmd(cmd, program, snap_name);
+                        }
+                    };
+                    cmd.stdout(Stdio::from(file));
+                    cmd.stderr(Stdio::from(stderr_file));
+                    info!(path = %path.display(), "Redirecting child output to log file");
+                }
+                Err(e) => {
+                    warn!(path = %path.display(), error = %e, "Failed to open log file, inheriting output");
+                    cmd.stdout(Stdio::inherit());
+                    cmd.stderr(Stdio::inherit());
+                }
+            }
         } else {
             // Inherit from parent so we can see child output for debugging
             cmd.stdout(Stdio::inherit());
@@ -256,6 +331,15 @@ impl ManagedProcess {
 
         cmd.stdin(Stdio::null());
 
+        Self::spawn_with_cmd(cmd, program, snap_name)
+    }
+
+    /// Complete the spawn process with the configured command
+    fn spawn_with_cmd(
+        mut cmd: Command,
+        program: &str,
+        snap_name: Option<String>,
+    ) -> HostResult<Self> {
         // Store the command name for later use in killing
         let command_name = program.to_string();
 
@@ -467,7 +551,7 @@ mod tests {
         let argv = vec!["true".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
 
         // Wait for it to complete
         let status = proc.wait().unwrap();
@@ -479,7 +563,7 @@ mod tests {
         let argv = vec!["echo".to_string(), "hello".to_string()];
         let env = HashMap::new();
 
-        let mut proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let mut proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
         let status = proc.wait().unwrap();
         assert!(status.is_success());
     }
@@ -489,7 +573,7 @@ mod tests {
         let argv = vec!["sleep".to_string(), "60".to_string()];
         let env = HashMap::new();
 
-        let proc = ManagedProcess::spawn(&argv, &env, None, false, None).unwrap();
+        let proc = ManagedProcess::spawn(&argv, &env, None, None, None).unwrap();
 
         // Give it a moment to start
         std::thread::sleep(std::time::Duration::from_millis(50));

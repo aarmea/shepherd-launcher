@@ -537,6 +537,27 @@ impl Service {
                             .get_entry(&entry_id)
                             .map(|e| e.kind.clone());
 
+                        // Build spawn options with log path if capture_child_output is enabled
+                        let spawn_options = if eng.policy().service.capture_child_output {
+                            let log_dir = &eng.policy().service.child_log_dir;
+                            // Create log filename: <entry_id>_<session_id>_<timestamp>.log
+                            let timestamp = now.format("%Y%m%d_%H%M%S").to_string();
+                            let log_filename = format!(
+                                "{}_{}.log",
+                                entry_id.as_str().replace(['/', '\\', ' '], "_"),
+                                timestamp
+                            );
+                            let log_path = log_dir.join(log_filename);
+                            shepherd_host_api::SpawnOptions {
+                                capture_stdout: true,
+                                capture_stderr: true,
+                                log_path: Some(log_path),
+                                ..Default::default()
+                            }
+                        } else {
+                            shepherd_host_api::SpawnOptions::default()
+                        };
+
                         drop(eng); // Release lock before spawning
 
                         if let Some(kind) = entry_kind {
@@ -544,7 +565,7 @@ impl Service {
                                 .spawn(
                                     plan.session_id.clone(),
                                     &kind,
-                                    shepherd_host_api::SpawnOptions::default(),
+                                    spawn_options,
                                 )
                                 .await
                             {

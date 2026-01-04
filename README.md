@@ -1,7 +1,7 @@
 # shepherd-launcher
 
-A child-friendly, parent-guided launcher for Wayland, allowing supervised
-access to applications and content that you define.
+A child-friendly, parent-guided desktop environment *alternative* for Wayland,
+allowing supervised access to applications and content that you define.
 
 Its primary goal is to return control of child-focused computing to parents,
 not software or hardware vendors, by providing:

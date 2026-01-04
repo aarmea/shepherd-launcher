@@ -31,6 +31,14 @@ pub struct RawServiceConfig {
     /// Data directory for store (default: $XDG_DATA_HOME/shepherdd)
     pub data_dir: Option<PathBuf>,
 
+    /// Capture stdout/stderr from child applications to log files
+    /// Files are written to child_log_dir (or log_dir/sessions if not set)
+    #[serde(default)]
+    pub capture_child_output: bool,
+
+    /// Directory for child application logs (default: log_dir/sessions)
+    pub child_log_dir: Option<PathBuf>,
+
     /// Default warning thresholds (can be overridden per entry)
     pub default_warnings: Option<Vec<RawWarningThreshold>>,
 
