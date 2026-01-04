@@ -273,6 +273,9 @@ impl ManagedProcess {
             cmd.env("WAYLAND_DISPLAY", shepherd_display);
         }
 
+        // Chromium-based browsers and Electron apps need this to use the correct password store.
+        cmd.env("PASSWORD_STORE", "gnome");
+
         // Add custom environment (these can override inherited vars)
         for (k, v) in env {
             cmd.env(k, v);
