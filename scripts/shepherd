@@ -21,6 +21,8 @@ source "$LIB_DIR/sway.sh"
 source "$LIB_DIR/install.sh"
 # shellcheck source=lib/harden.sh
 source "$LIB_DIR/harden.sh"
+# shellcheck source=lib/config.sh
+source "$LIB_DIR/config.sh"
 
 # Version
 VERSION="0.1.0"
@@ -35,6 +37,7 @@ Usage: shepherd <command> [subcommand] [options]
 Commands:
     deps        Manage system dependencies
     build       Build shepherd binaries
+    config      Configuration validation
     dev         Development commands
     install     Install shepherd to the system
     harden      User hardening for kiosk mode
@@ -60,6 +63,10 @@ Hardening:
     shepherd harden apply --user USER         Apply kiosk restrictions
     shepherd harden revert --user USER        Remove restrictions
 
+Configuration:
+    shepherd config validate                  Validate installed config
+    shepherd config validate <path>           Validate a specific file
+
 Options:
     -h, --help      Show this help message
     -V, --version   Show version
@@ -79,6 +86,9 @@ main() {
             ;;
         build)
             build_main "$@"
+            ;;
+        config)
+            config_main "$@"
             ;;
         dev)
             local subcmd="${1:-}"

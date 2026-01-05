@@ -21,7 +21,7 @@ use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode, Volume
 use shepherd_host_linux::{LinuxHost, LinuxVolumeController};
 use shepherd_ipc::{IpcServer, ServerMessage};
 use shepherd_store::{AuditEvent, AuditEventType, SqliteStore, Store};
-use shepherd_util::{ClientId, MonotonicInstant, RateLimiter};
+use shepherd_util::{default_config_path, ClientId, MonotonicInstant, RateLimiter};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,8 +35,8 @@ use tracing_subscriber::EnvFilter;
 #[command(name = "shepherdd")]
 #[command(about = "Policy enforcement service for child-focused computing", long_about = None)]
 struct Args {
-    /// Configuration file path
-    #[arg(short, long, default_value = "/etc/shepherdd/config.toml")]
+    /// Configuration file path (default: ~/.config/shepherd/config.toml)
+    #[arg(short, long, default_value_os_t = default_config_path())]
     config: PathBuf,
 
     /// Socket path override (or set SHEPHERD_SOCKET env var)

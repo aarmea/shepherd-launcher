@@ -65,7 +65,7 @@ shepherdd --log-level debug
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `-c, --config` | `/etc/shepherdd/config.toml` | Configuration file path |
+| `-c, --config` | `~/.config/shepherd/config.toml` | Configuration file path |
 | `-s, --socket` | From config | IPC socket path |
 | `-d, --data-dir` | From config | Data directory |
 | `-l, --log-level` | `info` | Log verbosity |
