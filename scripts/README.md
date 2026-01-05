@@ -15,6 +15,9 @@ This directory contains the unified script system for shepherd-launcher.
 # Building
 ./shepherd build [--release]
 
+# Configuration
+./shepherd config validate [path]
+
 # Development
 ./shepherd dev run
 
@@ -39,6 +42,7 @@ scripts/
 │   ├── common.sh      # Logging, error handling, sudo helpers
 │   ├── deps.sh        # Dependency management
 │   ├── build.sh       # Cargo build logic
+│   ├── config.sh      # Configuration validation
 │   ├── sway.sh        # Nested sway execution
 │   ├── install.sh     # Installation logic
 │   └── harden.sh      # User hardening/unhardening
