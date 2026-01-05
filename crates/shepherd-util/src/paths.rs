@@ -115,6 +115,37 @@ pub fn socket_dir() -> PathBuf {
     })
 }
 
+/// Configuration subdirectory name (uses "shepherd" not "shepherdd")
+const CONFIG_APP_DIR: &str = "shepherd";
+
+/// Configuration filename
+const CONFIG_FILENAME: &str = "config.toml";
+
+/// Get the default configuration file path.
+///
+/// Returns `$XDG_CONFIG_HOME/shepherd/config.toml` or `~/.config/shepherd/config.toml`
+pub fn default_config_path() -> PathBuf {
+    // Try XDG_CONFIG_HOME first
+    if let Ok(config_home) = std::env::var("XDG_CONFIG_HOME") {
+        return PathBuf::from(config_home)
+            .join(CONFIG_APP_DIR)
+            .join(CONFIG_FILENAME);
+    }
+
+    // Fallback to ~/.config/shepherd/config.toml
+    if let Ok(home) = std::env::var("HOME") {
+        return PathBuf::from(home)
+            .join(".config")
+            .join(CONFIG_APP_DIR)
+            .join(CONFIG_FILENAME);
+    }
+
+    // Last resort (unlikely to be valid, but provides a fallback)
+    PathBuf::from("/etc")
+        .join(CONFIG_APP_DIR)
+        .join(CONFIG_FILENAME)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -144,5 +175,12 @@ mod tests {
         let socket = socket_path_without_env();
         let dir = socket_dir();
         assert_eq!(socket.parent().unwrap(), dir);
+    }
+
+    #[test]
+    fn config_path_contains_shepherd() {
+        let path = default_config_path();
+        assert!(path.to_string_lossy().contains("shepherd"));
+        assert!(path.to_string_lossy().ends_with("config.toml"));
     }
 }

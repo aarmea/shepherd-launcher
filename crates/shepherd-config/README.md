@@ -86,8 +86,8 @@ max_run_seconds = 3600  # 1 hour
 use shepherd_config::{load_config, parse_config, Policy};
 use std::path::Path;
 
-// Load from file
-let policy = load_config("/etc/shepherdd/config.toml")?;
+// Load from file (typically ~/.config/shepherd/config.toml)
+let policy = load_config("config.toml")?;
 
 // Parse from string
 let toml_content = std::fs::read_to_string("config.toml")?;
