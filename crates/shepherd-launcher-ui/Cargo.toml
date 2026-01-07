@@ -24,6 +24,7 @@ tracing-subscriber = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 dirs = "5.0"
+gilrs = { workspace = true }
 
 [features]
 default = []

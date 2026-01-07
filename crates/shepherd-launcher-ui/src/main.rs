@@ -6,6 +6,7 @@
 mod app;
 mod client;
 mod grid;
+mod input;
 mod state;
 mod tile;
 

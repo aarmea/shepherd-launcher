@@ -27,5 +27,8 @@ libgirepository1.0-dev
 # Layer shell for HUD overlay
 libgtk4-layer-shell-dev
 
+# Gamepad/joystick support (for launcher input)
+libudev-dev
+
 # Required for rustup
 curl

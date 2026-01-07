@@ -2,7 +2,9 @@
 
 use gtk4::glib;
 use gtk4::prelude::*;
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
@@ -10,6 +12,7 @@ use tracing::{debug, error, info};
 
 use crate::client::{CommandClient, ServiceClient};
 use crate::grid::LauncherGrid;
+use crate::input::{key_to_nav_command, GamepadHandler};
 use crate::state::{LauncherState, SharedState};
 
 /// CSS styling for the launcher
@@ -39,6 +42,13 @@ window {
     background: #1f3460;
     background-color: #1f3460;
     border-color: #4a90d9;
+}
+
+.launcher-tile.selected {
+    background: #1f3460;
+    background-color: #1f3460;
+    border-color: #4a90d9;
+    box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.4);
 }
 
 .launcher-tile:active {
@@ -155,6 +165,36 @@ impl LauncherApp {
         stack.add_named(&disconnected_view.0, Some("disconnected"));
 
         window.set_child(Some(&stack));
+
+        // Set up keyboard input handling
+        let grid_for_key = grid.downgrade();
+        let key_controller = gtk4::EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, keyval, _keycode, _state| {
+            if let Some(cmd) = key_to_nav_command(keyval)
+                && let Some(grid) = grid_for_key.upgrade()
+            {
+                grid.handle_nav_command(cmd);
+                return glib::Propagation::Stop;
+            }
+            glib::Propagation::Proceed
+        });
+        window.add_controller(key_controller);
+
+        // Set up gamepad input handling in a background thread
+        let grid_for_gamepad = grid.downgrade();
+        let gamepad_handler = Rc::new(RefCell::new(GamepadHandler::new()));
+
+        // Poll gamepad at 60Hz using glib timeout
+        glib::timeout_add_local(std::time::Duration::from_millis(16), move || {
+            if let Some(handler) = gamepad_handler.borrow().as_ref() {
+                while let Some(cmd) = handler.try_recv() {
+                    if let Some(grid) = grid_for_gamepad.upgrade() {
+                        grid.handle_nav_command(cmd);
+                    }
+                }
+            }
+            glib::ControlFlow::Continue
+        });
 
         // Create shared state
         let state = SharedState::new();
@@ -339,9 +379,10 @@ impl LauncherApp {
                         stack.set_visible_child_name("loading");
                     }
                     LauncherState::Idle { entries } => {
-                        if let Some(grid) = grid {
+                        if let Some(ref grid) = grid {
                             grid.set_entries(entries);
                             grid.set_tiles_sensitive(true);
+                            grid.ensure_selection();
                         }
                         if let Some(ref win) = window {
                             win.set_visible(true);
