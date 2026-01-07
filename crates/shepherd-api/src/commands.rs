@@ -234,6 +234,7 @@ mod tests {
                 current_session: None,
                 entry_count: 5,
                 entries: vec![],
+                connectivity: Default::default(),
             }),
         );
 

@@ -121,6 +121,11 @@ pub enum ReasonCode {
     Disabled {
         reason: Option<String>,
     },
+    /// Network connectivity check failed
+    NetworkUnavailable {
+        /// The URL that was checked
+        check_url: String,
+    },
 }
 
 /// Warning severity level
@@ -197,6 +202,20 @@ pub struct ServiceStateSnapshot {
     /// Available entries for UI display
     #[serde(default)]
     pub entries: Vec<EntryView>,
+    /// Network connectivity status
+    #[serde(default)]
+    pub connectivity: ConnectivityStatus,
+}
+
+/// Network connectivity status
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ConnectivityStatus {
+    /// Whether global network connectivity check passed
+    pub connected: bool,
+    /// The URL that was checked for global connectivity
+    pub check_url: Option<String>,
+    /// When the last check was performed
+    pub last_check: Option<DateTime<Local>>,
 }
 
 /// Role for authorization

@@ -1,6 +1,6 @@
 //! Validated policy structures
 
-use crate::schema::{RawConfig, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
+use crate::schema::{RawConfig, RawEntry, RawEntryKind, RawNetworkConfig, RawEntryNetwork, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock, default_data_dir, default_log_dir, socket_path_without_env};
@@ -24,6 +24,9 @@ pub struct Policy {
 
     /// Global volume restrictions
     pub volume: VolumePolicy,
+
+    /// Network connectivity policy
+    pub network: NetworkPolicy,
 }
 
 impl Policy {
@@ -50,6 +53,13 @@ impl Policy {
             .map(convert_volume_config)
             .unwrap_or_default();
 
+        let network = raw
+            .service
+            .network
+            .as_ref()
+            .map(convert_network_config)
+            .unwrap_or_default();
+
         let entries = raw
             .entries
             .into_iter()
@@ -62,6 +72,7 @@ impl Policy {
             default_warnings,
             default_max_run,
             volume: global_volume,
+            network,
         }
     }
 
@@ -130,6 +141,7 @@ pub struct Entry {
     pub limits: LimitsPolicy,
     pub warnings: Vec<WarningThreshold>,
     pub volume: Option<VolumePolicy>,
+    pub network: NetworkRequirement,
     pub disabled: bool,
     pub disabled_reason: Option<String>,
 }
@@ -159,6 +171,11 @@ impl Entry {
             .map(|w| w.into_iter().map(convert_warning).collect())
             .unwrap_or_else(|| default_warnings.to_vec());
         let volume = raw.volume.as_ref().map(convert_volume_config);
+        let network = raw
+            .network
+            .as_ref()
+            .map(convert_entry_network)
+            .unwrap_or_default();
 
         Self {
             id: EntryId::new(raw.id),
@@ -169,6 +186,7 @@ impl Entry {
             limits,
             warnings,
             volume,
+            network,
             disabled: raw.disabled,
             disabled_reason: raw.disabled_reason,
         }
@@ -250,6 +268,52 @@ impl VolumePolicy {
     }
 }
 
+/// Default connectivity check URL (Google's connectivity check service)
+pub const DEFAULT_CHECK_URL: &str = "http://connectivitycheck.gstatic.com/generate_204";
+
+/// Default interval for periodic connectivity checks (60 seconds)
+pub const DEFAULT_CHECK_INTERVAL_SECS: u64 = 60;
+
+/// Default timeout for connectivity checks (5 seconds)
+pub const DEFAULT_CHECK_TIMEOUT_SECS: u64 = 5;
+
+/// Network connectivity policy
+#[derive(Debug, Clone)]
+pub struct NetworkPolicy {
+    /// URL to check for global network connectivity
+    pub check_url: String,
+    /// How often to perform periodic connectivity checks
+    pub check_interval: Duration,
+    /// Timeout for connectivity checks
+    pub check_timeout: Duration,
+}
+
+impl Default for NetworkPolicy {
+    fn default() -> Self {
+        Self {
+            check_url: DEFAULT_CHECK_URL.to_string(),
+            check_interval: Duration::from_secs(DEFAULT_CHECK_INTERVAL_SECS),
+            check_timeout: Duration::from_secs(DEFAULT_CHECK_TIMEOUT_SECS),
+        }
+    }
+}
+
+/// Network requirements for a specific entry
+#[derive(Debug, Clone, Default)]
+pub struct NetworkRequirement {
+    /// Whether this entry requires network connectivity to launch
+    pub required: bool,
+    /// Override check URL for this entry (uses global if None)
+    pub check_url_override: Option<String>,
+}
+
+impl NetworkRequirement {
+    /// Get the check URL to use for this entry, given the global policy
+    pub fn effective_check_url<'a>(&'a self, global: &'a NetworkPolicy) -> &'a str {
+        self.check_url_override.as_deref().unwrap_or(&global.check_url)
+    }
+}
+
 // Conversion helpers
 
 fn convert_entry_kind(raw: RawEntryKind) -> EntryKind {
@@ -279,6 +343,21 @@ fn convert_volume_config(raw: &RawVolumeConfig) -> VolumePolicy {
         min_volume: raw.min_volume,
         allow_mute: raw.allow_mute,
         allow_change: raw.allow_change,
+    }
+}
+
+fn convert_network_config(raw: &RawNetworkConfig) -> NetworkPolicy {
+    NetworkPolicy {
+        check_url: raw.check_url.clone().unwrap_or_else(|| DEFAULT_CHECK_URL.to_string()),
+        check_interval: Duration::from_secs(raw.check_interval_seconds.unwrap_or(DEFAULT_CHECK_INTERVAL_SECS)),
+        check_timeout: Duration::from_secs(raw.check_timeout_seconds.unwrap_or(DEFAULT_CHECK_TIMEOUT_SECS)),
+    }
+}
+
+fn convert_entry_network(raw: &RawEntryNetwork) -> NetworkRequirement {
+    NetworkRequirement {
+        required: raw.required,
+        check_url_override: raw.check_url.clone(),
     }
 }
 

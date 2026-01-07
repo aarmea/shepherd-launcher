@@ -3,7 +3,7 @@
 //! These tests verify the end-to-end behavior of shepherdd.
 
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
-use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy, Policy};
+use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy, NetworkRequirement, Policy};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision};
 use shepherd_host_api::{HostCapabilities, MockHost};
 use shepherd_store::{SqliteStore, Store};
@@ -48,6 +48,7 @@ fn make_test_policy() -> Policy {
                     },
                 ],
                 volume: None,
+                network: NetworkRequirement::default(),
                 disabled: false,
                 disabled_reason: None,
             },
@@ -55,6 +56,7 @@ fn make_test_policy() -> Policy {
         default_warnings: vec![],
         default_max_run: Some(Duration::from_secs(3600)),
         volume: Default::default(),
+        network: Default::default(),
     }
 }
 

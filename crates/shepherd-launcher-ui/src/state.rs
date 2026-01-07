@@ -117,6 +117,10 @@ impl SharedState {
             EventPayload::VolumeChanged { .. } => {
                 // Volume events are handled by HUD
             }
+            EventPayload::ConnectivityChanged { .. } => {
+                // Connectivity changes may affect entry availability - request fresh state
+                self.set(LauncherState::Connecting);
+            }
         }
     }
 

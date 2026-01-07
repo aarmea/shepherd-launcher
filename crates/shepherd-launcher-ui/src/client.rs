@@ -252,5 +252,6 @@ fn reason_to_message(reason: &ReasonCode) -> &'static str {
         ReasonCode::SessionActive { .. } => "Another session is active",
         ReasonCode::UnsupportedKind { .. } => "Entry type not supported",
         ReasonCode::Disabled { .. } => "Entry disabled",
+        ReasonCode::NetworkUnavailable { .. } => "Network connection required",
     }
 }

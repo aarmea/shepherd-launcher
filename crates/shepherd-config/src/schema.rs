@@ -48,6 +48,26 @@ pub struct RawServiceConfig {
     /// Global volume restrictions
     #[serde(default)]
     pub volume: Option<RawVolumeConfig>,
+
+    /// Network connectivity settings
+    #[serde(default)]
+    pub network: Option<RawNetworkConfig>,
+}
+
+/// Network connectivity configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RawNetworkConfig {
+    /// URL to check for global network connectivity
+    /// Default: "http://connectivitycheck.gstatic.com/generate_204"
+    pub check_url: Option<String>,
+
+    /// How often to perform periodic connectivity checks (in seconds)
+    /// Default: 30
+    pub check_interval_seconds: Option<u64>,
+
+    /// Timeout for connectivity checks (in seconds)
+    /// Default: 5
+    pub check_timeout_seconds: Option<u64>,
 }
 
 /// Raw entry definition
@@ -81,12 +101,30 @@ pub struct RawEntry {
     #[serde(default)]
     pub volume: Option<RawVolumeConfig>,
 
+    /// Network requirements for this entry
+    #[serde(default)]
+    pub network: Option<RawEntryNetwork>,
+
     /// Explicitly disabled
     #[serde(default)]
     pub disabled: bool,
 
     /// Reason for disabling
     pub disabled_reason: Option<String>,
+}
+
+/// Network requirements for an entry
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RawEntryNetwork {
+    /// Whether this entry requires network connectivity to launch
+    /// If true, the entry will not be available if the network check fails
+    #[serde(default)]
+    pub required: bool,
+
+    /// Override check URL for this entry
+    /// If specified, this URL will be checked instead of the global check_url
+    /// This is useful for entries that need specific services (e.g., Google, Microsoft)
+    pub check_url: Option<String>,
 }
 
 /// Raw entry kind

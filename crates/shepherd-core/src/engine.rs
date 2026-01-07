@@ -506,6 +506,8 @@ impl CoreEngine {
             current_session,
             entry_count: self.policy.entries.len(),
             entries,
+            // Connectivity is populated by the daemon, not the core engine
+            connectivity: Default::default(),
         }
     }
 
@@ -565,7 +567,7 @@ impl CoreEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy};
+    use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy, NetworkRequirement};
     use shepherd_api::EntryKind;
     use shepherd_store::SqliteStore;
     use std::collections::HashMap;
@@ -594,12 +596,14 @@ mod tests {
                 },
                 warnings: vec![],
                 volume: None,
+                network: NetworkRequirement::default(),
                 disabled: false,
                 disabled_reason: None,
             }],
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
             volume: Default::default(),
+            network: Default::default(),
         }
     }
 
@@ -677,6 +681,7 @@ mod tests {
                     message_template: Some("1 minute left".into()),
                 }],
                 volume: None,
+                network: NetworkRequirement::default(),
                 disabled: false,
                 disabled_reason: None,
             }],
@@ -684,6 +689,7 @@ mod tests {
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
             volume: Default::default(),
+            network: Default::default(),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());
@@ -742,6 +748,7 @@ mod tests {
                 },
                 warnings: vec![],
                 volume: None,
+                network: NetworkRequirement::default(),
                 disabled: false,
                 disabled_reason: None,
             }],
@@ -749,6 +756,7 @@ mod tests {
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
             volume: Default::default(),
+            network: Default::default(),
         };
 
         let store = Arc::new(SqliteStore::in_memory().unwrap());

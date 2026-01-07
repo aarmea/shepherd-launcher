@@ -8,17 +8,22 @@
 //! - Host adapter (Linux)
 //! - IPC server
 //! - Volume control
+//! - Network connectivity monitoring
 
 use anyhow::{Context, Result};
 use clap::Parser;
 use shepherd_api::{
-    Command, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
-    Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
+    Command, ConnectivityStatus, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
+    ReasonCode, Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo,
+    VolumeRestrictions,
 };
 use shepherd_config::{load_config, VolumePolicy};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision, StopDecision};
 use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode, VolumeController};
-use shepherd_host_linux::{LinuxHost, LinuxVolumeController};
+use shepherd_host_linux::{
+    ConnectivityConfig, ConnectivityEvent, ConnectivityHandle, ConnectivityMonitor, LinuxHost,
+    LinuxVolumeController,
+};
 use shepherd_ipc::{IpcServer, ServerMessage};
 use shepherd_store::{AuditEvent, AuditEventType, SqliteStore, Store};
 use shepherd_util::{default_config_path, ClientId, MonotonicInstant, RateLimiter};
@@ -26,7 +31,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal::unix::{signal, SignalKind};
-use tokio::sync::Mutex;
+use tokio::sync::{mpsc, watch, Mutex};
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
@@ -60,10 +65,12 @@ struct Service {
     ipc: Arc<IpcServer>,
     store: Arc<dyn Store>,
     rate_limiter: RateLimiter,
+    connectivity: ConnectivityHandle,
+    shutdown_tx: watch::Sender<bool>,
 }
 
 impl Service {
-    async fn new(args: &Args) -> Result<Self> {
+    async fn new(args: &Args) -> Result<(Self, mpsc::Receiver<ConnectivityEvent>)> {
         // Load configuration
         let policy = load_config(&args.config)
             .with_context(|| format!("Failed to load config from {:?}", args.config))?;
@@ -116,6 +123,7 @@ impl Service {
         }
 
         // Initialize core engine
+        let network_policy = policy.network.clone();
         let engine = CoreEngine::new(policy, store.clone(), host.capabilities().clone());
 
         // Initialize IPC server
@@ -127,17 +135,43 @@ impl Service {
         // Rate limiter: 30 requests per second per client
         let rate_limiter = RateLimiter::new(30, Duration::from_secs(1));
 
-        Ok(Self {
-            engine,
-            host,
-            volume,
-            ipc: Arc::new(ipc),
-            store,
-            rate_limiter,
-        })
+        // Initialize connectivity monitor
+        let (shutdown_tx, shutdown_rx) = watch::channel(false);
+        let connectivity_config = ConnectivityConfig {
+            check_url: network_policy.check_url,
+            check_interval: network_policy.check_interval,
+            check_timeout: network_policy.check_timeout,
+        };
+        let (connectivity_monitor, connectivity_events) =
+            ConnectivityMonitor::new(connectivity_config, shutdown_rx);
+        let connectivity = ConnectivityHandle::from_monitor(&connectivity_monitor);
+
+        // Spawn connectivity monitor task
+        tokio::spawn(async move {
+            connectivity_monitor.run().await;
+        });
+
+        info!(
+            check_url = %connectivity.global_check_url(),
+            "Connectivity monitor started"
+        );
+
+        Ok((
+            Self {
+                engine,
+                host,
+                volume,
+                ipc: Arc::new(ipc),
+                store,
+                rate_limiter,
+                connectivity,
+                shutdown_tx,
+            },
+            connectivity_events,
+        ))
     }
 
-    async fn run(self) -> Result<()> {
+    async fn run(self, mut connectivity_events: mpsc::Receiver<ConnectivityEvent>) -> Result<()> {
         // Start host process monitor
         let _monitor_handle = self.host.start_monitor();
 
@@ -155,6 +189,8 @@ impl Service {
         let host = self.host.clone();
         let volume = self.volume.clone();
         let store = self.store.clone();
+        let connectivity = self.connectivity.clone();
+        let shutdown_tx = self.shutdown_tx.clone();
 
         // Spawn IPC accept task
         let ipc_accept = ipc_ref.clone();
@@ -218,13 +254,21 @@ impl Service {
 
                 // IPC messages
                 Some(msg) = ipc_messages.recv() => {
-                    Self::handle_ipc_message(&engine, &host, &volume, &ipc_ref, &store, &rate_limiter, msg).await;
+                    Self::handle_ipc_message(&engine, &host, &volume, &ipc_ref, &store, &rate_limiter, &connectivity, msg).await;
+                }
+
+                // Connectivity events
+                Some(conn_event) = connectivity_events.recv() => {
+                    Self::handle_connectivity_event(&engine, &ipc_ref, &connectivity, conn_event).await;
                 }
             }
         }
 
         // Graceful shutdown
         info!("Shutting down shepherdd");
+
+        // Signal connectivity monitor to stop
+        let _ = shutdown_tx.send(true);
 
         // Stop all running sessions
         {
@@ -433,6 +477,45 @@ impl Service {
         }
     }
 
+    async fn handle_connectivity_event(
+        engine: &Arc<Mutex<CoreEngine>>,
+        ipc: &Arc<IpcServer>,
+        connectivity: &ConnectivityHandle,
+        event: ConnectivityEvent,
+    ) {
+        match event {
+            ConnectivityEvent::StatusChanged {
+                connected,
+                check_url,
+            } => {
+                info!(connected = connected, url = %check_url, "Connectivity status changed");
+
+                // Broadcast connectivity change event
+                ipc.broadcast_event(Event::new(EventPayload::ConnectivityChanged {
+                    connected,
+                    check_url,
+                }));
+
+                // Also broadcast state change so clients can update entry availability
+                let state = {
+                    let eng = engine.lock().await;
+                    let mut state = eng.get_state();
+                    state.connectivity = ConnectivityStatus {
+                        connected: connectivity.is_connected().await,
+                        check_url: Some(connectivity.global_check_url().to_string()),
+                        last_check: connectivity.last_check_time().await,
+                    };
+                    state
+                };
+                ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
+            }
+
+            ConnectivityEvent::InterfaceChanged => {
+                debug!("Network interface changed, connectivity recheck in progress");
+            }
+        }
+    }
+
     async fn handle_ipc_message(
         engine: &Arc<Mutex<CoreEngine>>,
         host: &Arc<LinuxHost>,
@@ -440,6 +523,7 @@ impl Service {
         ipc: &Arc<IpcServer>,
         store: &Arc<dyn Store>,
         rate_limiter: &Arc<Mutex<RateLimiter>>,
+        connectivity: &ConnectivityHandle,
         msg: ServerMessage,
     ) {
         match msg {
@@ -458,7 +542,7 @@ impl Service {
                 }
 
                 let response =
-                    Self::handle_command(engine, host, volume, ipc, store, &client_id, request.request_id, request.command)
+                    Self::handle_command(engine, host, volume, ipc, store, connectivity, &client_id, request.request_id, request.command)
                         .await;
 
                 let _ = ipc.send_response(&client_id, response).await;
@@ -504,6 +588,7 @@ impl Service {
         volume: &Arc<LinuxVolumeController>,
         ipc: &Arc<IpcServer>,
         store: &Arc<dyn Store>,
+        connectivity: &ConnectivityHandle,
         client_id: &ClientId,
         request_id: u64,
         command: Command,
@@ -513,7 +598,13 @@ impl Service {
 
         match command {
             Command::GetState => {
-                let state = engine.lock().await.get_state();
+                let mut state = engine.lock().await.get_state();
+                // Add connectivity status
+                state.connectivity = ConnectivityStatus {
+                    connected: connectivity.is_connected().await,
+                    check_url: Some(connectivity.global_check_url().to_string()),
+                    last_check: connectivity.last_check_time().await,
+                };
                 Response::success(request_id, ResponsePayload::State(state))
             }
 
@@ -525,6 +616,30 @@ impl Service {
 
             Command::Launch { entry_id } => {
                 let mut eng = engine.lock().await;
+
+                // First check if the entry requires network and if it's available
+                if let Some(entry) = eng.policy().get_entry(&entry_id)
+                    && entry.network.required
+                {
+                    let check_url = entry.network.effective_check_url(&eng.policy().network);
+                    let network_ok = connectivity.check_url(check_url).await;
+
+                    if !network_ok {
+                        info!(
+                            entry_id = %entry_id,
+                            check_url = %check_url,
+                            "Launch denied: network connectivity check failed"
+                        );
+                        return Response::success(
+                            request_id,
+                            ResponsePayload::LaunchDenied {
+                                reasons: vec![ReasonCode::NetworkUnavailable {
+                                    check_url: check_url.to_string(),
+                                }],
+                            },
+                        );
+                    }
+                }
 
                 match eng.request_launch(&entry_id, now) {
                     LaunchDecision::Approved(plan) => {
@@ -939,6 +1054,6 @@ async fn main() -> Result<()> {
     );
 
     // Create and run the service
-    let service = Service::new(&args).await?;
-    service.run().await
+    let (service, connectivity_events) = Service::new(&args).await?;
+    service.run(connectivity_events).await
 }

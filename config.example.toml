@@ -30,6 +30,16 @@ max_volume = 80      # Maximum volume percentage (0-100)
 allow_mute = true    # Whether mute toggle is allowed
 allow_change = true  # Whether volume changes are allowed at all
 
+# Network connectivity settings (optional)
+# Used to check if Internet is available before allowing network-dependent entries
+[service.network]
+# URL to check for global network connectivity (default: Google's connectivity check)
+# check_url = "http://connectivitycheck.gstatic.com/generate_204"
+# How often to perform periodic connectivity checks, in seconds (default: 60)
+# check_interval_seconds = 60
+# Timeout for connectivity checks, in seconds (default: 5)
+# check_timeout_seconds = 5
+
 # Default warning thresholds
 [[service.default_warnings]]
 seconds_before = 300
@@ -211,6 +221,11 @@ message = "30 seconds! Save NOW!"
 [entries.volume]
 max_volume = 60  # Limit volume during gaming sessions
 
+# Network requirements for online games
+[entries.network]
+required = true  # Minecraft needs network for authentication and multiplayer
+check_url = "http://www.msftconnecttest.com/connecttest.txt"  # Use Microsoft's check (Minecraft is owned by Microsoft)
+
 ## === Steam games ===
 # Steam can be used via Canonical's Steam snap package:
 # https://snapcraft.io/steam
@@ -244,6 +259,9 @@ end = "20:00"
 # No [entries.limits] section - uses service defaults
 # Omitting limits entirely uses default_max_run_seconds
 
+[entries.network]
+required = true  # Steam needs network for authentication
+
 # A Short Hike via Steam
 # https://store.steampowered.com/app/1055540/A_Short_Hike/
 [[entries]]
@@ -266,6 +284,9 @@ end = "18:00"
 days = "weekends"
 start = "10:00"
 end = "20:00"
+
+[entries.network]
+required = true  # Steam needs network for authentication
 
 ## === Media ===
 # Just use `mpv` to play media (for now).
@@ -313,6 +334,9 @@ always = true
 max_run_seconds = 0  # Unlimited: sleep/study aid
 daily_quota_seconds = 0  # Unlimited
 cooldown_seconds = 0  # No cooldown
+
+[entries.network]
+required = true  # YouTube streaming needs network
 
 # Terminal for debugging only
 [[entries]]

@@ -88,6 +88,14 @@ pub enum EventPayload {
         event_type: String,
         details: serde_json::Value,
     },
+
+    /// Network connectivity status changed
+    ConnectivityChanged {
+        /// Whether global connectivity check now passes
+        connected: bool,
+        /// The URL that was checked
+        check_url: String,
+    },
 }
 
 #[cfg(test)]

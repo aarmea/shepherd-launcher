@@ -17,6 +17,11 @@ nix = { workspace = true }
 async-trait = "0.1"
 dirs = "5.0"
 shell-escape = "0.1"
+chrono = { workspace = true }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+netlink-sys = "0.8"
+netlink-packet-core = "0.7"
+netlink-packet-route = "0.21"
 
 [dev-dependencies]
 tempfile = { workspace = true }
