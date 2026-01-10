@@ -79,6 +79,7 @@ impl LauncherTile {
         let fallback_icon = match entry.kind_tag {
             shepherd_api::EntryKindTag::Process => "application-x-executable",
             shepherd_api::EntryKindTag::Snap => "application-x-executable",
+            shepherd_api::EntryKindTag::Flatpak => "application-x-executable",
             shepherd_api::EntryKindTag::Vm => "computer",
             shepherd_api::EntryKindTag::Media => "video-x-generic",
             shepherd_api::EntryKindTag::Custom => "applications-other",

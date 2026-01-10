@@ -104,16 +104,16 @@ All behavior shown above is driven entirely by declarative configuration.
 For the Minecraft example shown above:
 
 ```toml
-# Minecraft via mc-installer snap
-# Ubuntu: sudo snap install mc-installer
+# Prism Launcher - Minecraft launcher (Flatpak)
+# Install: flatpak install flathub org.prismlauncher.PrismLauncher
 [[entries]]
-id = "minecraft"
-label = "Minecraft"
-icon = "minecraft"
+id = "prism-launcher"
+label = "Prism Launcher"
+icon = "org.prismlauncher.PrismLauncher"
 
 [entries.kind]
-type = "snap"
-snap_name = "mc-installer"
+type = "flatpak"
+app_id = "org.prismlauncher.PrismLauncher"
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -160,7 +160,7 @@ compatibility infrastructure:
 
 * Wayland and Sway
 * Rust
-* Snap
+* Flatpak and Snap
 * Proton and WINE
 
 This project was written with the assistance of generative AI-based coding

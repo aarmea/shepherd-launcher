@@ -116,6 +116,17 @@ pub enum RawEntryKind {
         #[serde(default)]
         env: HashMap<String, String>,
     },
+    /// Flatpak application - uses systemd scope-based process management
+    Flatpak {
+        /// The Flatpak application ID (e.g., "org.prismlauncher.PrismLauncher")
+        app_id: String,
+        /// Additional command-line arguments
+        #[serde(default)]
+        args: Vec<String>,
+        /// Additional environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
     Vm {
         driver: String,
         #[serde(default)]

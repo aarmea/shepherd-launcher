@@ -54,6 +54,9 @@ fn main() -> ExitCode {
                         EntryKind::Snap { snap_name, .. } => {
                             format!("snap ({})", snap_name)
                         }
+                        EntryKind::Flatpak { app_id, .. } => {
+                            format!("flatpak ({})", app_id)
+                        }
                         EntryKind::Vm { driver, .. } => {
                             format!("vm ({})", driver)
                         }
