@@ -127,9 +127,10 @@ EOF
 install_config() {
     local user="${1:-}"
     local source_config="${2:-}"
+    local force="${3:-false}"
     
     if [[ -z "$user" ]]; then
-        die "Usage: shepherd install config --user USER [--source CONFIG]"
+        die "Usage: shepherd install config --user USER [--source CONFIG] [--force]"
     fi
     
     validate_user "$user"
@@ -161,7 +162,15 @@ install_config() {
     
     # Check if config already exists
     if maybe_sudo test -f "$dst_config"; then
-        warn "Config file already exists at $dst_config, skipping"
+        if [[ "$force" == "true" ]]; then
+            warn "Overwriting existing config at $dst_config"
+            maybe_sudo cp "$source_config" "$dst_config"
+            maybe_sudo chown "$user:$user" "$dst_config"
+            maybe_sudo chmod 0644 "$dst_config"
+            success "Overwrote user configuration for $user"
+        else
+            warn "Config file already exists at $dst_config, skipping (use --force to overwrite)"
+        fi
     else
         # Copy config file
         maybe_sudo cp "$source_config" "$dst_config"
@@ -175,9 +184,10 @@ install_config() {
 install_all() {
     local user="${1:-}"
     local prefix="${2:-$DEFAULT_PREFIX}"
+    local force="${3:-false}"
     
     if [[ -z "$user" ]]; then
-        die "Usage: shepherd install all --user USER [--prefix PREFIX]"
+        die "Usage: shepherd install all --user USER [--prefix PREFIX] [--force]"
     fi
     
     require_root
@@ -188,7 +198,7 @@ install_all() {
     install_bins "$prefix"
     install_sway_config "$prefix"
     install_desktop_entry "$prefix"
-    install_config "$user"
+    install_config "$user" "" "$force"
     
     success "Installation complete!"
     info ""
@@ -206,6 +216,7 @@ install_main() {
     local user=""
     local prefix="$DEFAULT_PREFIX"
     local source_config=""
+    local force="false"
     
     # Parse remaining arguments
     while [[ $# -gt 0 ]]; do
@@ -222,6 +233,10 @@ install_main() {
                 source_config="$2"
                 shift 2
                 ;;
+            --force|-f)
+                force="true"
+                shift
+                ;;
             *)
                 die "Unknown option: $1"
                 ;;
@@ -233,7 +248,7 @@ install_main() {
             install_bins "$prefix"
             ;;
         config)
-            install_config "$user" "$source_config"
+            install_config "$user" "$source_config" "$force"
             ;;
         sway-config)
             install_sway_config "$prefix"
@@ -242,7 +257,7 @@ install_main() {
             install_desktop_entry "$prefix"
             ;;
         all)
-            install_all "$user" "$prefix"
+            install_all "$user" "$prefix" "$force"
             ;;
         ""|help|-h|--help)
             cat <<EOF
@@ -259,6 +274,7 @@ Options:
     --user USER       Target user for config deployment (required for config/all)
     --prefix PREFIX   Installation prefix (default: $DEFAULT_PREFIX)
     --source CONFIG   Source config file (default: config.example.toml)
+    --force, -f       Overwrite existing configuration files
 
 Environment:
     DESTDIR           Installation root for packaging (default: empty)
@@ -266,6 +282,7 @@ Environment:
 Examples:
     shepherd install bins --prefix /usr/local
     shepherd install config --user kiosk
+    shepherd install config --user kiosk --force
     shepherd install all --user kiosk --prefix /usr
 EOF
             ;;
