@@ -59,6 +59,7 @@ impl HostCapabilities {
         let mut spawn_kinds = HashSet::new();
         spawn_kinds.insert(EntryKindTag::Process);
         spawn_kinds.insert(EntryKindTag::Snap);
+        spawn_kinds.insert(EntryKindTag::Flatpak);
         spawn_kinds.insert(EntryKindTag::Vm);
         spawn_kinds.insert(EntryKindTag::Media);
 

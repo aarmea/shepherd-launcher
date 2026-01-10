@@ -13,6 +13,7 @@ use std::time::Duration;
 pub enum EntryKindTag {
     Process,
     Snap,
+    Flatpak,
     Vm,
     Media,
     Custom,
@@ -46,6 +47,17 @@ pub enum EntryKind {
         #[serde(default)]
         env: HashMap<String, String>,
     },
+    /// Flatpak application - uses systemd scope-based process management
+    Flatpak {
+        /// The Flatpak application ID (e.g., "org.prismlauncher.PrismLauncher")
+        app_id: String,
+        /// Additional command-line arguments
+        #[serde(default)]
+        args: Vec<String>,
+        /// Additional environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
     Vm {
         driver: String,
         #[serde(default)]
@@ -67,6 +79,7 @@ impl EntryKind {
         match self {
             EntryKind::Process { .. } => EntryKindTag::Process,
             EntryKind::Snap { .. } => EntryKindTag::Snap,
+            EntryKind::Flatpak { .. } => EntryKindTag::Flatpak,
             EntryKind::Vm { .. } => EntryKindTag::Vm,
             EntryKind::Media { .. } => EntryKindTag::Media,
             EntryKind::Custom { .. } => EntryKindTag::Custom,

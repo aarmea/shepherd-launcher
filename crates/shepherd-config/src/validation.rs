@@ -71,6 +71,14 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
                 });
             }
         }
+        RawEntryKind::Flatpak { app_id, .. } => {
+            if app_id.is_empty() {
+                errors.push(ValidationError::EntryError {
+                    entry_id: entry.id.clone(),
+                    message: "app_id cannot be empty".into(),
+                });
+            }
+        }
         RawEntryKind::Vm { driver, .. } => {
             if driver.is_empty() {
                 errors.push(ValidationError::EntryError {

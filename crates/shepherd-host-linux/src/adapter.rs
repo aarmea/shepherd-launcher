@@ -13,7 +13,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
-use crate::process::{init, kill_by_command, kill_snap_cgroup, ManagedProcess};
+use crate::process::{init, kill_by_command, kill_flatpak_cgroup, kill_snap_cgroup, ManagedProcess};
 
 /// Expand `~` at the beginning of a path to the user's home directory
 fn expand_tilde(path: &str) -> String {
@@ -39,6 +39,7 @@ fn expand_args(args: &[String]) -> Vec<String> {
 struct SessionInfo {
     command_name: String,
     snap_name: Option<String>,
+    flatpak_app_id: Option<String>,
 }
 
 /// Linux host adapter
@@ -132,15 +133,15 @@ impl HostAdapter for LinuxHost {
         entry_kind: &EntryKind,
         options: SpawnOptions,
     ) -> HostResult<HostSessionHandle> {
-        // Extract argv, env, cwd, and snap_name based on entry kind
-        let (argv, env, cwd, snap_name) = match entry_kind {
+        // Extract argv, env, cwd, snap_name, and flatpak_app_id based on entry kind
+        let (argv, env, cwd, snap_name, flatpak_app_id) = match entry_kind {
             EntryKind::Process { command, args, env, cwd } => {
                 let mut argv = vec![expand_tilde(command)];
                 argv.extend(expand_args(args));
                 let expanded_cwd = cwd.as_ref().map(|c| {
                     std::path::PathBuf::from(expand_tilde(&c.to_string_lossy()))
                 });
-                (argv, env.clone(), expanded_cwd, None)
+                (argv, env.clone(), expanded_cwd, None, None)
             }
             EntryKind::Snap { snap_name, command, args, env } => {
                 // For snap apps, we need to use 'snap run <snap_name>' to launch them.
@@ -153,7 +154,13 @@ impl HostAdapter for LinuxHost {
                         argv.push(cmd.clone());
                     }
                 argv.extend(expand_args(args));
-                (argv, env.clone(), None, Some(snap_name.clone()))
+                (argv, env.clone(), None, Some(snap_name.clone()), None)
+            }
+            EntryKind::Flatpak { app_id, args, env } => {
+                // For Flatpak apps, we use 'flatpak run <app_id>' to launch them.
+                let mut argv = vec!["flatpak".to_string(), "run".to_string(), app_id.clone()];
+                argv.extend(expand_args(args));
+                (argv, env.clone(), None, None, Some(app_id.clone()))
             }
             EntryKind::Vm { driver, args } => {
                 // Construct command line from VM driver
@@ -166,13 +173,13 @@ impl HostAdapter for LinuxHost {
                         argv.push(value.to_string());
                     }
                 }
-                (argv, HashMap::new(), None, None)
+                (argv, HashMap::new(), None, None, None)
             }
             EntryKind::Media { library_id, args: _ } => {
                 // For media, we'd typically launch a media player
                 // This is a placeholder - real implementation would integrate with a player
                 let argv = vec!["xdg-open".to_string(), expand_tilde(library_id)];
-                (argv, HashMap::new(), None, None)
+                (argv, HashMap::new(), None, None, None)
             }
             EntryKind::Custom { type_name: _, payload: _ } => {
                 return Err(HostError::UnsupportedKind);
@@ -180,19 +187,24 @@ impl HostAdapter for LinuxHost {
         };
 
         // Get the command name for fallback killing
-        // For snap apps, use the snap_name (not "snap") to avoid killing unrelated processes
+        // For snap/flatpak apps, use the app name (not "snap"/"flatpak") to avoid killing unrelated processes
         let command_name = if let Some(ref snap) = snap_name {
             snap.clone()
+        } else if let Some(ref app_id) = flatpak_app_id {
+            app_id.clone()
         } else {
             argv.first().cloned().unwrap_or_default()
         };
+
+        // Determine if this is a sandboxed app (snap or flatpak)
+        let sandboxed_app_name = snap_name.clone().or_else(|| flatpak_app_id.clone());
         
         let proc = ManagedProcess::spawn(
             &argv,
             &env,
             cwd.as_ref(),
             options.log_path.clone(),
-            snap_name.clone(),
+            sandboxed_app_name,
         )?;
 
         let pid = proc.pid;
@@ -202,9 +214,10 @@ impl HostAdapter for LinuxHost {
         let session_info_entry = SessionInfo {
             command_name: command_name.clone(),
             snap_name: snap_name.clone(),
+            flatpak_app_id: flatpak_app_id.clone(),
         };
         self.session_info.lock().unwrap().insert(session_id.clone(), session_info_entry);
-        info!(session_id = %session_id, command = %command_name, snap = ?snap_name, "Tracking session info");
+        info!(session_id = %session_id, command = %command_name, snap = ?snap_name, flatpak = ?flatpak_app_id, "Tracking session info");
 
         let handle = HostSessionHandle::new(
             session_id,
@@ -238,13 +251,16 @@ impl HostAdapter for LinuxHost {
 
         match mode {
             StopMode::Graceful { timeout } => {
-                // If this is a snap app, use cgroup-based killing (most reliable)
+                // If this is a snap or flatpak app, use cgroup-based killing (most reliable)
                 if let Some(ref info) = session_info {
                     if let Some(ref snap) = info.snap_name {
                         kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGTERM);
                         info!(snap = %snap, "Sent SIGTERM via snap cgroup");
+                    } else if let Some(ref app_id) = info.flatpak_app_id {
+                        kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGTERM);
+                        info!(flatpak = %app_id, "Sent SIGTERM via flatpak cgroup");
                     } else {
-                        // Fall back to command name for non-snap apps
+                        // Fall back to command name for non-sandboxed apps
                         kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGTERM);
                         info!(command = %info.command_name, "Sent SIGTERM via command name");
                     }
@@ -262,11 +278,14 @@ impl HostAdapter for LinuxHost {
                 let start = std::time::Instant::now();
                 loop {
                     if start.elapsed() >= timeout {
-                        // Force kill after timeout using snap cgroup or command name
+                        // Force kill after timeout using snap/flatpak cgroup or command name
                         if let Some(ref info) = session_info {
                             if let Some(ref snap) = info.snap_name {
                                 kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
                                 info!(snap = %snap, "Sent SIGKILL via snap cgroup (timeout)");
+                            } else if let Some(ref app_id) = info.flatpak_app_id {
+                                kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGKILL);
+                                info!(flatpak = %app_id, "Sent SIGKILL via flatpak cgroup (timeout)");
                             } else {
                                 kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGKILL);
                                 info!(command = %info.command_name, "Sent SIGKILL via command name (timeout)");
@@ -292,11 +311,14 @@ impl HostAdapter for LinuxHost {
                 }
             }
             StopMode::Force => {
-                // Force kill via snap cgroup or command name
+                // Force kill via snap/flatpak cgroup or command name
                 if let Some(ref info) = session_info {
                     if let Some(ref snap) = info.snap_name {
                         kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
                         info!(snap = %snap, "Sent SIGKILL via snap cgroup");
+                    } else if let Some(ref app_id) = info.flatpak_app_id {
+                        kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGKILL);
+                        info!(flatpak = %app_id, "Sent SIGKILL via flatpak cgroup");
                     } else {
                         kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGKILL);
                         info!(command = %info.command_name, "Sent SIGKILL via command name");

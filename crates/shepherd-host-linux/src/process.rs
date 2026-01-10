@@ -91,6 +91,70 @@ pub fn kill_snap_cgroup(snap_name: &str, _signal: Signal) -> bool {
     stopped_any
 }
 
+/// Kill all processes in a Flatpak app's cgroup using systemd
+/// Flatpak apps create scopes at: app-flatpak-<app_id>-<number>.scope
+/// For example: app-flatpak-org.prismlauncher.PrismLauncher-12345.scope
+/// Similar to snap apps, we use systemctl --user to manage the scopes.
+pub fn kill_flatpak_cgroup(app_id: &str, _signal: Signal) -> bool {
+    let uid = nix::unistd::getuid().as_raw();
+    let base_path = format!(
+        "/sys/fs/cgroup/user.slice/user-{}.slice/user@{}.service/app.slice",
+        uid, uid
+    );
+    
+    // Flatpak uses a different naming pattern than snap
+    // The app_id dots are preserved: app-flatpak-org.example.App-<number>.scope
+    let pattern = format!("app-flatpak-{}-", app_id);
+    
+    let base = std::path::Path::new(&base_path);
+    if !base.exists() {
+        debug!(path = %base_path, "Flatpak cgroup base path doesn't exist");
+        return false;
+    }
+    
+    let mut stopped_any = false;
+    
+    if let Ok(entries) = std::fs::read_dir(base) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            
+            if name_str.starts_with(&pattern) && name_str.ends_with(".scope") {
+                let scope_name = name_str.to_string();
+                
+                // Always use SIGKILL for flatpak apps to prevent self-restart behavior
+                // Using systemctl kill --signal=KILL sends SIGKILL to all processes in scope
+                let result = Command::new("systemctl")
+                    .args(["--user", "kill", "--signal=KILL", &scope_name])
+                    .output();
+                
+                match result {
+                    Ok(output) => {
+                        if output.status.success() {
+                            info!(scope = %scope_name, "Killed flatpak scope via systemctl SIGKILL");
+                            stopped_any = true;
+                        } else {
+                            let stderr = String::from_utf8_lossy(&output.stderr);
+                            warn!(scope = %scope_name, stderr = %stderr, "systemctl kill command failed");
+                        }
+                    }
+                    Err(e) => {
+                        warn!(scope = %scope_name, error = %e, "Failed to run systemctl");
+                    }
+                }
+            }
+        }
+    }
+    
+    if stopped_any {
+        info!(app_id = app_id, "Killed flatpak scope(s) via systemctl SIGKILL");
+    } else {
+        debug!(app_id = app_id, "No flatpak scope found to kill");
+    }
+    
+    stopped_any
+}
+
 /// Kill processes by command name using pkill
 pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
     let signal_name = match signal {

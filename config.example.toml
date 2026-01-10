@@ -165,52 +165,6 @@ max_run_seconds = 0  # Unlimited
 daily_quota_seconds = 0  # Unlimited
 cooldown_seconds = 0  # No cooldown
 
-# Minecraft via mc-installer snap
-# Ubuntu: sudo snap install mc-installer
-[[entries]]
-id = "minecraft"
-label = "Minecraft"
-icon = "~/.minecraft/launcher/icons/minecraft256.png"
-
-[entries.kind]
-type = "snap"
-snap_name = "mc-installer"
-
-[entries.availability]
-[[entries.availability.windows]]
-days = "weekdays"
-start = "15:00"
-end = "18:00"
-
-[[entries.availability.windows]]
-days = "weekends"
-start = "10:00"
-end = "20:00"
-
-[entries.limits]
-max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
-daily_quota_seconds = 3600  # 1 hour per day
-cooldown_seconds = 600  # 10 minute cooldown
-
-[[entries.warnings]]
-seconds_before = 600
-severity = "info"
-message = "10 minutes left - start wrapping up!"
-
-[[entries.warnings]]
-seconds_before = 120
-severity = "warn"
-message = "2 minutes remaining - save your game!"
-
-[[entries.warnings]]
-seconds_before = 30
-severity = "critical"
-message = "30 seconds! Save NOW!"
-
-# Entry-specific volume restrictions (overrides global)
-[entries.volume]
-max_volume = 60  # Limit volume during gaming sessions
-
 ## === Steam games ===
 # Steam can be used via Canonical's Steam snap package:
 # https://snapcraft.io/steam
@@ -266,6 +220,76 @@ end = "18:00"
 days = "weekends"
 start = "10:00"
 end = "20:00"
+
+## === Flatpak-based applications ===
+# Flatpak entries use the "flatpak" type for proper process management.
+# Similar to Snap, Flatpak apps run in sandboxed environments and use
+# systemd scopes for process management.
+
+# Prism Launcher - Minecraft launcher (Flatpak)
+# Install: flatpak install flathub org.prismlauncher.PrismLauncher
+[[entries]]
+id = "prism-launcher"
+label = "Prism Launcher"
+icon = "org.prismlauncher.PrismLauncher"
+
+[entries.kind]
+type = "flatpak"
+app_id = "org.prismlauncher.PrismLauncher"
+
+[entries.availability]
+[[entries.availability.windows]]
+days = "weekdays"
+start = "15:00"
+end = "18:00"
+
+[[entries.availability.windows]]
+days = "weekends"
+start = "10:00"
+end = "20:00"
+
+[entries.limits]
+max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
+daily_quota_seconds = 3600  # 1 hour per day
+cooldown_seconds = 600  # 10 minute cooldown
+
+[[entries.warnings]]
+seconds_before = 600
+severity = "info"
+message = "10 minutes left - start wrapping up!"
+
+[[entries.warnings]]
+seconds_before = 120
+severity = "warn"
+message = "2 minutes remaining - save your game!"
+
+[[entries.warnings]]
+seconds_before = 30
+severity = "critical"
+message = "30 seconds! Save NOW!"
+
+# Entry-specific volume restrictions (overrides global)
+[entries.volume]
+max_volume = 60  # Limit volume during gaming sessions
+
+# Krita - digital painting (Flatpak)
+# Install: flatpak install flathub org.kde.krita
+[[entries]]
+id = "krita"
+label = "Krita"
+icon = "org.kde.krita"
+
+[entries.kind]
+type = "flatpak"
+app_id = "org.kde.krita"
+
+[entries.availability]
+always = true
+
+[entries.limits]
+max_run_seconds = 0  # Unlimited
+daily_quota_seconds = 0  # Unlimited
+cooldown_seconds = 0  # No cooldown
 
 ## === Media ===
 # Just use `mpv` to play media (for now).
