@@ -48,6 +48,8 @@ mod imp {
             obj.set_valign(gtk4::Align::Fill);
             obj.set_hexpand(true);
             obj.set_vexpand(true);
+            obj.set_can_focus(true);
+            obj.set_focusable(true);
 
             // Configure flow box
             self.flow_box.set_homogeneous(true);
@@ -61,6 +63,52 @@ mod imp {
             self.flow_box.set_hexpand(true);
             self.flow_box.set_vexpand(true);
             self.flow_box.add_css_class("launcher-grid");
+
+            // Add keyboard activation for when FlowBox has focus
+            let flow_box_key_controller = gtk4::EventControllerKey::new();
+            let on_launch_clone = self.on_launch.clone();
+            let flow_box_weak = self.flow_box.downgrade();
+            flow_box_key_controller.connect_key_pressed(move |_, key, _, _| {
+                if key == gtk4::gdk::Key::Return || key == gtk4::gdk::Key::space {
+                    if let Some(flow_box) = flow_box_weak.upgrade() {
+                        // Get the currently focused child (FlowBoxChild wrapper)
+                        if let Some(focus_child) = flow_box.focus_child() {
+                            // FlowBox wraps children in FlowBoxChild, so get the actual child
+                            if let Some(flow_box_child) = focus_child.downcast_ref::<gtk4::FlowBoxChild>() {
+                                if let Some(child) = flow_box_child.child() {
+                                    if let Ok(tile) = child.downcast::<super::LauncherTile>() {
+                                        if let Some(entry_id) = tile.entry_id()
+                                            && let Some(callback) = on_launch_clone.borrow().as_ref() {
+                                                callback(entry_id);
+                                                return glib::Propagation::Stop;
+                                            }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                glib::Propagation::Proceed
+            });
+            self.flow_box.add_controller(flow_box_key_controller);
+
+            // Add arrow key capture to start navigation without Tab
+            let arrow_key_controller = gtk4::EventControllerKey::new();
+            arrow_key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
+            let flow_box_weak_arrow = self.flow_box.downgrade();
+            arrow_key_controller.connect_key_pressed(move |_, key, _, _| {
+                // Check if an arrow key was pressed
+                if matches!(key, gtk4::gdk::Key::Up | gtk4::gdk::Key::Down | gtk4::gdk::Key::Left | gtk4::gdk::Key::Right) {
+                    if let Some(flow_box) = flow_box_weak_arrow.upgrade() {
+                        // If the flow box doesn't have focus, grab it
+                        if !flow_box.has_focus() {
+                            flow_box.grab_focus();
+                        }
+                    }
+                }
+                glib::Propagation::Proceed
+            });
+            obj.add_controller(arrow_key_controller);
 
             // Wrap in a scrolled window
             let scrolled = gtk4::ScrolledWindow::new();
@@ -122,9 +170,31 @@ impl LauncherGrid {
                     }
             });
 
+            // Connect keyboard activation (Enter/Space)
+            let key_controller = gtk4::EventControllerKey::new();
+            let on_launch_key = imp.on_launch.clone();
+            let tile_weak = tile.downgrade();
+            key_controller.connect_key_pressed(move |_, key, _, _| {
+                if key == gtk4::gdk::Key::Return || key == gtk4::gdk::Key::space {
+                    if let Some(tile) = tile_weak.upgrade() {
+                        if let Some(entry_id) = tile.entry_id()
+                            && let Some(callback) = on_launch_key.borrow().as_ref() {
+                                callback(entry_id);
+                            }
+                    }
+                    glib::Propagation::Stop
+                } else {
+                    glib::Propagation::Proceed
+                }
+            });
+            tile.add_controller(key_controller);
+
             imp.flow_box.insert(&tile, -1);
             imp.tiles.borrow_mut().push(tile);
         }
+
+        // Automatically grab focus when entries are set
+        self.grab_focus();
     }
 
     /// Enable or disable all tiles
