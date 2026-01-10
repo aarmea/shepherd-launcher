@@ -64,7 +64,7 @@ If it can run on Linux in *any way, shape, or form*, it can be supervised by
 ![Minecraft hosted within shepherd-launcher UI](./docs/readme/apps-minecraft.jpg)
 
 > [Minecraft](https://www.minecraft.net/) running via the
-> [mc-installer Snap](https://snapcraft.io/mc-installer)
+> [Prism Launcher Flatpak](https://flathub.org/en/apps/org.prismlauncher.PrismLauncher)
 
 ![Celeste hosted within shepherd-launcher UI](./docs/readme/apps-celeste.png)
 
