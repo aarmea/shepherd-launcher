@@ -180,10 +180,11 @@ pub fn find_steam_game_pids(app_id: u32) -> Vec<i32> {
                     };
                     for key in &keys {
                         let prefix = format!("{}=", key);
-                        if let Some(val) = var_str.strip_prefix(&prefix) {
-                            if val == target {
-                                pids.push(pid);
-                            }
+                        if var_str
+                            .strip_prefix(&prefix)
+                            .is_some_and(|val| val == target)
+                        {
+                            pids.push(pid);
                         }
                     }
                 }

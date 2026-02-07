@@ -154,10 +154,9 @@ impl LinuxHost {
                 for session in &steam_snapshot {
                     let has_game = !find_steam_game_pids(session.app_id).is_empty();
                     if has_game {
-                        if let Some(mut map) = steam_sessions.lock().ok() {
-                            if let Some(entry) = map.get_mut(&session.pid) {
-                                entry.seen_game = true;
-                            }
+                        if let Ok(mut map) = steam_sessions.lock() {
+                            map.entry(session.pid)
+                                .and_modify(|entry| entry.seen_game = true);
                         }
                     } else if session.seen_game {
                         ended.push((session.pid, session.pgid));
@@ -356,10 +355,8 @@ impl HostAdapter for LinuxHost {
                         info!(snap = %snap, "Sent SIGTERM via snap cgroup");
                     } else if let Some(app_id) = info.steam_app_id {
                         let _ = kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGTERM);
-                        if let Some(mut map) = self.steam_sessions.lock().ok() {
-                            if let Some(entry) = map.get_mut(&pid) {
-                                entry.seen_game = true;
-                            }
+                        if let Ok(mut map) = self.steam_sessions.lock() {
+                            map.entry(pid).and_modify(|entry| entry.seen_game = true);
                         }
                         info!(steam_app_id = app_id, "Sent SIGTERM to Steam game processes");
                     } else if let Some(ref app_id) = info.flatpak_app_id {
@@ -437,10 +434,8 @@ impl HostAdapter for LinuxHost {
                         info!(snap = %snap, "Sent SIGKILL via snap cgroup");
                     } else if let Some(app_id) = info.steam_app_id {
                         let _ = kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGKILL);
-                        if let Some(mut map) = self.steam_sessions.lock().ok() {
-                            if let Some(entry) = map.get_mut(&pid) {
-                                entry.seen_game = true;
-                            }
+                        if let Ok(mut map) = self.steam_sessions.lock() {
+                            map.entry(pid).and_modify(|entry| entry.seen_game = true);
                         }
                         info!(steam_app_id = app_id, "Sent SIGKILL to Steam game processes");
                     } else if let Some(ref app_id) = info.flatpak_app_id {
