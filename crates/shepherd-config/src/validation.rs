@@ -1,6 +1,7 @@
 //! Configuration validation
 
 use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawTimeWindow};
+use crate::internet::InternetCheckTarget;
 use std::collections::HashSet;
 use thiserror::Error;
 
@@ -33,6 +34,31 @@ pub enum ValidationError {
 /// Validate a raw configuration
 pub fn validate_config(config: &RawConfig) -> Vec<ValidationError> {
     let mut errors = Vec::new();
+
+    // Validate global internet check (if set)
+    if let Some(internet) = &config.service.internet
+        && let Some(check) = &internet.check
+        && let Err(e) = InternetCheckTarget::parse(check) {
+            errors.push(ValidationError::GlobalError(format!(
+                "Invalid internet check '{}': {}",
+                check, e
+            )));
+        }
+
+    if let Some(internet) = &config.service.internet {
+        if let Some(interval) = internet.interval_seconds
+            && interval == 0 {
+                errors.push(ValidationError::GlobalError(
+                    "Internet check interval_seconds must be > 0".into(),
+                ));
+            }
+        if let Some(timeout) = internet.timeout_ms
+            && timeout == 0 {
+                errors.push(ValidationError::GlobalError(
+                    "Internet check timeout_ms must be > 0".into(),
+                ));
+            }
+    }
 
     // Check for duplicate entry IDs
     let mut seen_ids = HashSet::new();
@@ -141,6 +167,33 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
                 }
             }
         // Note: warnings are ignored for unlimited entries (max_run = 0)
+    }
+
+    // Validate internet requirements
+    if let Some(internet) = &entry.internet {
+        if let Some(check) = &internet.check
+            && let Err(e) = InternetCheckTarget::parse(check) {
+                errors.push(ValidationError::EntryError {
+                    entry_id: entry.id.clone(),
+                    message: format!("Invalid internet check '{}': {}", check, e),
+                });
+            }
+
+        if internet.required {
+            let has_check = internet.check.is_some()
+                || config
+                    .service
+                    .internet
+                    .as_ref()
+                    .and_then(|cfg| cfg.check.as_ref())
+                    .is_some();
+            if !has_check {
+                errors.push(ValidationError::EntryError {
+                    entry_id: entry.id.clone(),
+                    message: "internet is required but no check is configured (set service.internet.check or entries.internet.check)".into(),
+                });
+            }
+        }
     }
 
     errors
@@ -278,6 +331,7 @@ mod tests {
                     volume: None,
                     disabled: false,
                     disabled_reason: None,
+                    internet: None,
                 },
                 RawEntry {
                     id: "game".into(),
@@ -295,6 +349,7 @@ mod tests {
                     volume: None,
                     disabled: false,
                     disabled_reason: None,
+                    internet: None,
                 },
             ],
         };

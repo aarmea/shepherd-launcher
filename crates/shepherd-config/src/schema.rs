@@ -48,6 +48,10 @@ pub struct RawServiceConfig {
     /// Global volume restrictions
     #[serde(default)]
     pub volume: Option<RawVolumeConfig>,
+
+    /// Internet connectivity check settings
+    #[serde(default)]
+    pub internet: Option<RawInternetConfig>,
 }
 
 /// Raw entry definition
@@ -87,6 +91,10 @@ pub struct RawEntry {
 
     /// Reason for disabling
     pub disabled_reason: Option<String>,
+
+    /// Internet requirement for this entry
+    #[serde(default)]
+    pub internet: Option<RawEntryInternet>,
 }
 
 /// Raw entry kind
@@ -213,6 +221,30 @@ pub struct RawWarningThreshold {
 
     /// Message template
     pub message: Option<String>,
+}
+
+/// Internet connectivity check configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RawInternetConfig {
+    /// Connectivity check target (e.g., "https://example.com" or "tcp://1.1.1.1:53")
+    pub check: Option<String>,
+
+    /// Interval between checks (seconds)
+    pub interval_seconds: Option<u64>,
+
+    /// Timeout per check (milliseconds)
+    pub timeout_ms: Option<u64>,
+}
+
+/// Per-entry internet requirement
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct RawEntryInternet {
+    /// Whether this entry requires internet connectivity
+    #[serde(default)]
+    pub required: bool,
+
+    /// Override connectivity check target for this entry
+    pub check: Option<String>,
 }
 
 fn default_severity() -> String {

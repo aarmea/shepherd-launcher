@@ -9,10 +9,12 @@
 mod policy;
 mod schema;
 mod validation;
+mod internet;
 
 pub use policy::*;
 pub use schema::*;
 pub use validation::*;
+pub use internet::*;
 
 use std::path::Path;
 use thiserror::Error;

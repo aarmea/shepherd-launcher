@@ -30,6 +30,14 @@ max_volume = 80      # Maximum volume percentage (0-100)
 allow_mute = true    # Whether mute toggle is allowed
 allow_change = true  # Whether volume changes are allowed at all
 
+# Internet connectivity check (optional)
+# Entries can require internet and will be hidden when offline.
+# Supported schemes: https://, http://, tcp://
+[service.internet]
+check = "https://connectivitycheck.gstatic.com/generate_204"
+interval_seconds = 300  # Keep this high to avoid excessive network requests
+timeout_ms = 1500
+
 # Default warning thresholds
 [[service.default_warnings]]
 seconds_before = 300
@@ -245,6 +253,10 @@ end = "18:00"
 days = "weekends"
 start = "10:00"
 end = "20:00"
+
+[entries.internet]
+required = true
+check = "http://www.msftconnecttest.com/connecttest.txt"  # Use Microsoft's test URL (Minecraft is owned by Microsoft)
 
 [entries.limits]
 max_run_seconds = 1800  # 30 minutes (roughly 3 in-game days)
