@@ -60,6 +60,7 @@ mod imp {
             self.flow_box.set_valign(gtk4::Align::Center);
             self.flow_box.set_hexpand(true);
             self.flow_box.set_vexpand(true);
+            self.flow_box.set_can_focus(true);
             self.flow_box.add_css_class("launcher-grid");
 
             // Wrap in a scrolled window
@@ -125,12 +126,39 @@ impl LauncherGrid {
             imp.flow_box.insert(&tile, -1);
             imp.tiles.borrow_mut().push(tile);
         }
+
+        self.focus_first_tile();
     }
 
     /// Enable or disable all tiles
     pub fn set_tiles_sensitive(&self, sensitive: bool) {
         for tile in self.imp().tiles.borrow().iter() {
             tile.set_sensitive(sensitive);
+        }
+    }
+
+    pub fn move_focus(&self, direction: gtk4::DirectionType) {
+        self.ensure_focus();
+        self.imp().flow_box.child_focus(direction);
+    }
+
+    fn ensure_focus(&self) {
+        if self
+            .imp()
+            .tiles
+            .borrow()
+            .iter()
+            .any(|tile| tile.has_focus())
+        {
+            return;
+        }
+
+        self.focus_first_tile();
+    }
+
+    fn focus_first_tile(&self) {
+        if let Some(tile) = self.imp().tiles.borrow().first() {
+            tile.grab_focus();
         }
     }
 }

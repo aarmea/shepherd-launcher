@@ -1,6 +1,7 @@
 //! Main GTK4 application for the launcher
 
 use gtk4::glib;
+use gtk4::gdk;
 use gtk4::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,6 +40,14 @@ window {
     background: #1f3460;
     background-color: #1f3460;
     border-color: #4a90d9;
+}
+
+.launcher-tile:focus,
+.launcher-tile:focus-visible {
+    background: #1f3460;
+    background-color: #1f3460;
+    border-color: #f8c24e;
+    outline: none;
 }
 
 .launcher-tile:active {
@@ -155,6 +164,61 @@ impl LauncherApp {
         stack.add_named(&disconnected_view.0, Some("disconnected"));
 
         window.set_child(Some(&stack));
+
+        let grid_for_keys = grid.downgrade();
+        let window_for_keys = window.downgrade();
+        let key_controller = gtk4::EventControllerKey::new();
+        key_controller.connect_key_pressed(move |_, key, _, modifiers| {
+            let Some(window) = window_for_keys.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+            let Some(grid) = grid_for_keys.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+
+            let is_alt = modifiers.contains(gdk::ModifierType::ALT_MASK);
+            let is_ctrl = modifiers.contains(gdk::ModifierType::CONTROL_MASK);
+
+            if (key == gdk::Key::w || key == gdk::Key::W) && is_ctrl {
+                window.close();
+                return glib::Propagation::Stop;
+            }
+
+            let handled = match key {
+                gdk::Key::Up | gdk::Key::KP_Up | gdk::Key::w | gdk::Key::W => {
+                    grid.move_focus(gtk4::DirectionType::Up);
+                    true
+                }
+                gdk::Key::Down | gdk::Key::KP_Down | gdk::Key::s | gdk::Key::S => {
+                    grid.move_focus(gtk4::DirectionType::Down);
+                    true
+                }
+                gdk::Key::Left | gdk::Key::KP_Left | gdk::Key::a | gdk::Key::A => {
+                    grid.move_focus(gtk4::DirectionType::Left);
+                    true
+                }
+                gdk::Key::Right | gdk::Key::KP_Right | gdk::Key::d | gdk::Key::D => {
+                    grid.move_focus(gtk4::DirectionType::Right);
+                    true
+                }
+                gdk::Key::Home | gdk::Key::KP_Home => {
+                    window.close();
+                    true
+                }
+                gdk::Key::F4 if is_alt => {
+                    window.close();
+                    true
+                }
+                _ => false,
+            };
+
+            if handled {
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        window.add_controller(key_controller);
 
         // Create shared state
         let state = SharedState::new();

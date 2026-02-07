@@ -51,6 +51,7 @@ mod imp {
             obj.add_css_class("launcher-tile");
             obj.add_css_class("flat");
             obj.set_size_request(160, 160);
+            obj.set_can_focus(true);
         }
     }
 
