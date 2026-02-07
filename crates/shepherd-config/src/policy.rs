@@ -256,6 +256,7 @@ fn convert_entry_kind(raw: RawEntryKind) -> EntryKind {
     match raw {
         RawEntryKind::Process { command, args, env, cwd } => EntryKind::Process { command, args, env, cwd },
         RawEntryKind::Snap { snap_name, command, args, env } => EntryKind::Snap { snap_name, command, args, env },
+        RawEntryKind::Steam { app_id, args, env } => EntryKind::Steam { app_id, args, env },
         RawEntryKind::Flatpak { app_id, args, env } => EntryKind::Flatpak { app_id, args, env },
         RawEntryKind::Vm { driver, args } => EntryKind::Vm { driver, args },
         RawEntryKind::Media { library_id, args } => EntryKind::Media { library_id, args },

@@ -90,6 +90,21 @@ let entry_kind = EntryKind::Snap {
 let handle = host.spawn(session_id, &entry_kind, options).await?;
 ```
 
+### Spawning Steam Games
+
+Steam games are launched via the Steam snap:
+
+```rust
+let entry_kind = EntryKind::Steam {
+    app_id: 504230,
+    args: vec![],
+    env: Default::default(),
+};
+
+// Spawns via: snap run steam steam://rungameid/504230
+let handle = host.spawn(session_id, &entry_kind, options).await?;
+```
+
 ### Stopping Sessions
 
 ```rust

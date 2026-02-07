@@ -54,6 +54,9 @@ fn main() -> ExitCode {
                         EntryKind::Snap { snap_name, .. } => {
                             format!("snap ({})", snap_name)
                         }
+                        EntryKind::Steam { app_id, .. } => {
+                            format!("steam ({})", app_id)
+                        }
                         EntryKind::Flatpak { app_id, .. } => {
                             format!("flatpak ({})", app_id)
                         }

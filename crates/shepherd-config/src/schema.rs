@@ -116,6 +116,17 @@ pub enum RawEntryKind {
         #[serde(default)]
         env: HashMap<String, String>,
     },
+    /// Steam game launched via the Steam snap (Linux)
+    Steam {
+        /// Steam App ID (e.g., 504230 for Celeste)
+        app_id: u32,
+        /// Additional command-line arguments passed to Steam
+        #[serde(default)]
+        args: Vec<String>,
+        /// Additional environment variables
+        #[serde(default)]
+        env: HashMap<String, String>,
+    },
     /// Flatpak application - uses systemd scope-based process management
     Flatpak {
         /// The Flatpak application ID (e.g., "org.prismlauncher.PrismLauncher")
