@@ -30,6 +30,8 @@ use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
 
+mod internet;
+
 /// shepherdd - Policy enforcement service for child-focused computing
 #[derive(Parser, Debug)]
 #[command(name = "shepherdd")]
@@ -60,6 +62,7 @@ struct Service {
     ipc: Arc<IpcServer>,
     store: Arc<dyn Store>,
     rate_limiter: RateLimiter,
+    internet_monitor: Option<internet::InternetMonitor>,
 }
 
 impl Service {
@@ -118,6 +121,9 @@ impl Service {
         // Initialize core engine
         let engine = CoreEngine::new(policy, store.clone(), host.capabilities().clone());
 
+        // Initialize internet connectivity monitor (if configured)
+        let internet_monitor = internet::InternetMonitor::from_policy(engine.policy());
+
         // Initialize IPC server
         let mut ipc = IpcServer::new(&socket_path);
         ipc.start().await?;
@@ -134,6 +140,7 @@ impl Service {
             ipc: Arc::new(ipc),
             store,
             rate_limiter,
+            internet_monitor,
         })
     }
 
@@ -155,6 +162,14 @@ impl Service {
         let host = self.host.clone();
         let volume = self.volume.clone();
         let store = self.store.clone();
+
+        // Start internet connectivity monitoring (if configured)
+        if let Some(monitor) = self.internet_monitor {
+            let engine_ref = engine.clone();
+            tokio::spawn(async move {
+                monitor.run(engine_ref).await;
+            });
+        }
 
         // Spawn IPC accept task
         let ipc_accept = ipc_ref.clone();

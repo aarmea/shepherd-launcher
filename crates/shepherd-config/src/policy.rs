@@ -1,6 +1,13 @@
 //! Validated policy structures
 
-use crate::schema::{RawConfig, RawEntry, RawEntryKind, RawVolumeConfig, RawServiceConfig, RawWarningThreshold};
+use crate::schema::{
+    RawConfig, RawEntry, RawEntryKind, RawInternetConfig, RawVolumeConfig, RawServiceConfig,
+    RawWarningThreshold,
+};
+use crate::internet::{
+    EntryInternetPolicy, InternetCheckTarget, InternetConfig, DEFAULT_INTERNET_CHECK_INTERVAL,
+    DEFAULT_INTERNET_CHECK_TIMEOUT,
+};
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
 use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock, default_data_dir, default_log_dir, socket_path_without_env};
@@ -81,6 +88,8 @@ pub struct ServiceConfig {
     pub capture_child_output: bool,
     /// Directory for child application logs
     pub child_log_dir: PathBuf,
+    /// Internet connectivity configuration
+    pub internet: InternetConfig,
 }
 
 impl ServiceConfig {
@@ -92,6 +101,7 @@ impl ServiceConfig {
         let child_log_dir = raw
             .child_log_dir
             .unwrap_or_else(|| log_dir.join("sessions"));
+        let internet = convert_internet_config(raw.internet.as_ref());
         Self {
             socket_path: raw
                 .socket_path
@@ -102,6 +112,7 @@ impl ServiceConfig {
             data_dir: raw
                 .data_dir
                 .unwrap_or_else(default_data_dir),
+            internet,
         }
     }
 }
@@ -115,6 +126,7 @@ impl Default for ServiceConfig {
             log_dir,
             data_dir: default_data_dir(),
             capture_child_output: false,
+            internet: InternetConfig::new(None, DEFAULT_INTERNET_CHECK_INTERVAL, DEFAULT_INTERNET_CHECK_TIMEOUT),
         }
     }
 }
@@ -132,6 +144,7 @@ pub struct Entry {
     pub volume: Option<VolumePolicy>,
     pub disabled: bool,
     pub disabled_reason: Option<String>,
+    pub internet: EntryInternetPolicy,
 }
 
 impl Entry {
@@ -159,6 +172,7 @@ impl Entry {
             .map(|w| w.into_iter().map(convert_warning).collect())
             .unwrap_or_else(|| default_warnings.to_vec());
         let volume = raw.volume.as_ref().map(convert_volume_config);
+        let internet = convert_entry_internet(raw.internet.as_ref());
 
         Self {
             id: EntryId::new(raw.id),
@@ -171,6 +185,7 @@ impl Entry {
             volume,
             disabled: raw.disabled,
             disabled_reason: raw.disabled_reason,
+            internet,
         }
     }
 }
@@ -282,6 +297,33 @@ fn convert_volume_config(raw: &RawVolumeConfig) -> VolumePolicy {
         allow_mute: raw.allow_mute,
         allow_change: raw.allow_change,
     }
+}
+
+fn convert_internet_config(raw: Option<&RawInternetConfig>) -> InternetConfig {
+    let check = raw
+        .and_then(|cfg| cfg.check.as_ref())
+        .and_then(|value| InternetCheckTarget::parse(value).ok());
+
+    let interval = raw
+        .and_then(|cfg| cfg.interval_seconds)
+        .map(Duration::from_secs)
+        .unwrap_or(DEFAULT_INTERNET_CHECK_INTERVAL);
+
+    let timeout = raw
+        .and_then(|cfg| cfg.timeout_ms)
+        .map(Duration::from_millis)
+        .unwrap_or(DEFAULT_INTERNET_CHECK_TIMEOUT);
+
+    InternetConfig::new(check, interval, timeout)
+}
+
+fn convert_entry_internet(raw: Option<&crate::schema::RawEntryInternet>) -> EntryInternetPolicy {
+    let required = raw.map(|cfg| cfg.required).unwrap_or(false);
+    let check = raw
+        .and_then(|cfg| cfg.check.as_ref())
+        .and_then(|value| InternetCheckTarget::parse(value).ok());
+
+    EntryInternetPolicy { required, check }
 }
 
 fn convert_time_window(raw: crate::schema::RawTimeWindow) -> TimeWindow {

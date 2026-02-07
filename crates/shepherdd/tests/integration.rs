@@ -50,6 +50,7 @@ fn make_test_policy() -> Policy {
                 volume: None,
                 disabled: false,
                 disabled_reason: None,
+                internet: Default::default(),
             },
         ],
         default_warnings: vec![],

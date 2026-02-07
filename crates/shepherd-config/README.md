@@ -23,6 +23,12 @@ socket_path = "/run/shepherdd/shepherdd.sock"
 data_dir = "/var/lib/shepherdd"
 default_max_run_seconds = 1800  # 30 minutes default
 
+# Internet connectivity check (optional)
+[service.internet]
+check = "https://connectivitycheck.gstatic.com/generate_204"
+interval_seconds = 10
+timeout_ms = 1500
+
 # Global volume restrictions
 [service.volume]
 max_volume = 80
@@ -48,6 +54,9 @@ id = "minecraft"
 label = "Minecraft"
 icon = "minecraft"
 kind = { type = "snap", snap_name = "mc-installer" }
+
+[entries.internet]
+required = true
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -149,6 +158,22 @@ Control session duration and frequency:
 max_run_seconds = 1800        # Max duration per session
 daily_quota_seconds = 7200    # Total daily limit
 cooldown_seconds = 600        # Wait time between sessions
+```
+
+### Internet Requirements
+
+Entries can require internet connectivity. When the device is offline, those entries are hidden.
+
+```toml
+[service.internet]
+check = "https://connectivitycheck.gstatic.com/generate_204"
+interval_seconds = 300
+timeout_ms = 1500
+
+[entries.internet]
+required = true
+# Optional per-entry override:
+# check = "tcp://1.1.1.1:53"
 ```
 
 ## Validation

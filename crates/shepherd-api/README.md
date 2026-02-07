@@ -104,6 +104,7 @@ if view.enabled {
             ReasonCode::QuotaExhausted { used, quota } => { /* ... */ }
             ReasonCode::CooldownActive { available_at } => { /* ... */ }
             ReasonCode::SessionActive { entry_id, remaining } => { /* ... */ }
+            ReasonCode::InternetUnavailable { check } => { /* ... */ }
             // ...
         }
     }

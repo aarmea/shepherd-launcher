@@ -5,11 +5,11 @@ use shepherd_api::{
     ServiceStateSnapshot, EntryView, ReasonCode, SessionEndReason,
     WarningSeverity, API_VERSION,
 };
-use shepherd_config::{Entry, Policy};
+use shepherd_config::{Entry, Policy, InternetCheckTarget};
 use shepherd_host_api::{HostCapabilities, HostSessionHandle};
 use shepherd_store::{AuditEvent, AuditEventType, Store};
 use shepherd_util::{EntryId, MonotonicInstant, SessionId};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info};
@@ -38,6 +38,8 @@ pub struct CoreEngine {
     current_session: Option<ActiveSession>,
     /// Tracks which entries were enabled on the last tick, to detect availability changes
     last_availability_set: HashSet<EntryId>,
+    /// Latest known internet connectivity status per check target
+    internet_status: HashMap<InternetCheckTarget, bool>,
 }
 
 impl CoreEngine {
@@ -63,6 +65,7 @@ impl CoreEngine {
             capabilities,
             current_session: None,
             last_availability_set: HashSet::new(),
+            internet_status: HashMap::new(),
         }
     }
 
@@ -83,6 +86,16 @@ impl CoreEngine {
         info!(entry_count, "Policy reloaded");
 
         CoreEvent::PolicyReloaded { entry_count }
+    }
+
+    /// Update internet connectivity status for a check target.
+    pub fn set_internet_status(&mut self, target: InternetCheckTarget, available: bool) -> bool {
+        let previous = self.internet_status.insert(target, available);
+        previous != Some(available)
+    }
+
+    fn internet_available(&self, target: &InternetCheckTarget) -> bool {
+        self.internet_status.get(target).copied().unwrap_or(false)
     }
 
     /// List all entries with availability status
@@ -120,6 +133,25 @@ impl CoreEngine {
             reasons.push(ReasonCode::OutsideTimeWindow {
                 next_window_start: None, // TODO: compute next window
             });
+        }
+
+        // Check internet requirement
+        if entry.internet.required {
+            let check = entry
+                .internet
+                .check
+                .as_ref()
+                .or(self.policy.service.internet.check.as_ref());
+            let available = check
+                .map(|target| self.internet_available(target))
+                .unwrap_or(false);
+
+            if !available {
+                enabled = false;
+                reasons.push(ReasonCode::InternetUnavailable {
+                    check: check.map(|target| target.original.clone()),
+                });
+            }
         }
 
         // Check if another session is active
@@ -596,6 +628,7 @@ mod tests {
                 volume: None,
                 disabled: false,
                 disabled_reason: None,
+                internet: Default::default(),
             }],
             default_warnings: vec![],
             default_max_run: Some(Duration::from_secs(3600)),
@@ -679,6 +712,7 @@ mod tests {
                 volume: None,
                 disabled: false,
                 disabled_reason: None,
+                internet: Default::default(),
             }],
             service: Default::default(),
             default_warnings: vec![],
@@ -744,6 +778,7 @@ mod tests {
                 volume: None,
                 disabled: false,
                 disabled_reason: None,
+                internet: Default::default(),
             }],
             service: Default::default(),
             default_warnings: vec![],

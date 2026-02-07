@@ -147,6 +147,10 @@ pub enum ReasonCode {
     Disabled {
         reason: Option<String>,
     },
+    /// Internet connectivity is required but unavailable
+    InternetUnavailable {
+        check: Option<String>,
+    },
 }
 
 /// Warning severity level
