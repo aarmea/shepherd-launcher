@@ -155,6 +155,59 @@ pub fn kill_flatpak_cgroup(app_id: &str, _signal: Signal) -> bool {
     stopped_any
 }
 
+/// Find Steam game process IDs by Steam App ID (from environment variables)
+pub fn find_steam_game_pids(app_id: u32) -> Vec<i32> {
+    let mut pids = Vec::new();
+    let target = app_id.to_string();
+    let keys = ["SteamAppId", "SteamAppID", "STEAM_APP_ID"];
+
+    if let Ok(entries) = std::fs::read_dir("/proc") {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy();
+            if let Ok(pid) = name_str.parse::<i32>() {
+                let env_path = format!("/proc/{}/environ", pid);
+                let Ok(env_bytes) = std::fs::read(&env_path) else {
+                    continue;
+                };
+
+                for var in env_bytes.split(|b| *b == 0) {
+                    if var.is_empty() {
+                        continue;
+                    }
+                    let Ok(var_str) = std::str::from_utf8(var) else {
+                        continue;
+                    };
+                    for key in &keys {
+                        let prefix = format!("{}=", key);
+                        if let Some(val) = var_str.strip_prefix(&prefix) {
+                            if val == target {
+                                pids.push(pid);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pids
+}
+
+/// Kill Steam game processes by Steam App ID
+pub fn kill_steam_game_processes(app_id: u32, signal: Signal) -> bool {
+    let pids = find_steam_game_pids(app_id);
+    if pids.is_empty() {
+        return false;
+    }
+
+    for pid in pids {
+        let _ = signal::kill(Pid::from_raw(pid), signal);
+    }
+
+    true
+}
+
 /// Kill processes by command name using pkill
 pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
     let signal_name = match signal {

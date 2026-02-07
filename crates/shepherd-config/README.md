@@ -110,6 +110,9 @@ kind = { type = "process", command = "/usr/bin/game", args = ["--fullscreen"] }
 # Snap application
 kind = { type = "snap", snap_name = "mc-installer" }
 
+# Steam game (via Steam snap)
+kind = { type = "steam", app_id = 504230 }
+
 # Virtual machine (future)
 kind = { type = "vm", driver = "qemu", args = { disk = "game.qcow2" } }
 

@@ -71,6 +71,14 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
                 });
             }
         }
+        RawEntryKind::Steam { app_id, .. } => {
+            if *app_id == 0 {
+                errors.push(ValidationError::EntryError {
+                    entry_id: entry.id.clone(),
+                    message: "app_id must be > 0".into(),
+                });
+            }
+        }
         RawEntryKind::Flatpak { app_id, .. } => {
             if app_id.is_empty() {
                 errors.push(ValidationError::EntryError {

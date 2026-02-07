@@ -180,9 +180,8 @@ label = "Celeste"
 icon = "~/Games/Icons/Celeste.png"
 
 [entries.kind]
-type = "snap"
-snap_name = "steam"
-args = ["steam://rungameid/504230"]  # Steam App ID (passed to 'snap run steam')
+type = "steam"
+app_id = 504230  # Steam App ID
 
 [entries.availability]
 [[entries.availability.windows]]
@@ -206,9 +205,8 @@ label = "A Short Hike"
 icon = "~/Games/Icons/A_Short_Hike.png"
 
 [entries.kind]
-type = "snap"
-snap_name = "steam"
-args = ["steam://rungameid/1055540"]  # Steam App ID (passed to 'snap run steam')
+type = "steam"
+app_id = 1055540  # Steam App ID
 
 [entries.availability]
 [[entries.availability.windows]]

@@ -30,6 +30,7 @@ let caps = host.capabilities();
 // Check supported entry kinds
 if caps.supports_kind(EntryKindTag::Process) { /* ... */ }
 if caps.supports_kind(EntryKindTag::Snap) { /* ... */ }
+if caps.supports_kind(EntryKindTag::Steam) { /* ... */ }
 
 // Check enforcement capabilities
 if caps.can_kill_forcefully { /* Can use SIGKILL/TerminateProcess */ }
