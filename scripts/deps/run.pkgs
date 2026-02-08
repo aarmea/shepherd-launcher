@@ -13,3 +13,4 @@ xdg-desktop-portal-wlr
 libgtk-4-1
 libadwaita-1-0
 libgtk4-layer-shell0
+libudev1
