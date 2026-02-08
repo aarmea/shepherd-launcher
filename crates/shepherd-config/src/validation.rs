@@ -1,7 +1,7 @@
 //! Configuration validation
 
-use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawTimeWindow};
 use crate::internet::InternetCheckTarget;
+use crate::schema::{RawConfig, RawDays, RawEntry, RawEntryKind, RawTimeWindow};
 use std::collections::HashSet;
 use thiserror::Error;
 
@@ -38,26 +38,29 @@ pub fn validate_config(config: &RawConfig) -> Vec<ValidationError> {
     // Validate global internet check (if set)
     if let Some(internet) = &config.service.internet
         && let Some(check) = &internet.check
-        && let Err(e) = InternetCheckTarget::parse(check) {
-            errors.push(ValidationError::GlobalError(format!(
-                "Invalid internet check '{}': {}",
-                check, e
-            )));
-        }
+        && let Err(e) = InternetCheckTarget::parse(check)
+    {
+        errors.push(ValidationError::GlobalError(format!(
+            "Invalid internet check '{}': {}",
+            check, e
+        )));
+    }
 
     if let Some(internet) = &config.service.internet {
         if let Some(interval) = internet.interval_seconds
-            && interval == 0 {
-                errors.push(ValidationError::GlobalError(
-                    "Internet check interval_seconds must be > 0".into(),
-                ));
-            }
+            && interval == 0
+        {
+            errors.push(ValidationError::GlobalError(
+                "Internet check interval_seconds must be > 0".into(),
+            ));
+        }
         if let Some(timeout) = internet.timeout_ms
-            && timeout == 0 {
-                errors.push(ValidationError::GlobalError(
-                    "Internet check timeout_ms must be > 0".into(),
-                ));
-            }
+            && timeout == 0
+        {
+            errors.push(ValidationError::GlobalError(
+                "Internet check timeout_ms must be > 0".into(),
+            ));
+        }
     }
 
     // Check for duplicate entry IDs
@@ -156,28 +159,30 @@ fn validate_entry(entry: &RawEntry, config: &RawConfig) -> Vec<ValidationError> 
 
     // Only validate warnings if max_run is Some and not 0 (unlimited)
     if let (Some(warnings), Some(max_run)) = (&entry.warnings, max_run)
-        && max_run > 0 {
-            for warning in warnings {
-                if warning.seconds_before >= max_run {
-                    errors.push(ValidationError::WarningExceedsMaxRun {
-                        entry_id: entry.id.clone(),
-                        seconds: warning.seconds_before,
-                        max_run,
-                    });
-                }
+        && max_run > 0
+    {
+        for warning in warnings {
+            if warning.seconds_before >= max_run {
+                errors.push(ValidationError::WarningExceedsMaxRun {
+                    entry_id: entry.id.clone(),
+                    seconds: warning.seconds_before,
+                    max_run,
+                });
             }
+        }
         // Note: warnings are ignored for unlimited entries (max_run = 0)
     }
 
     // Validate internet requirements
     if let Some(internet) = &entry.internet {
         if let Some(check) = &internet.check
-            && let Err(e) = InternetCheckTarget::parse(check) {
-                errors.push(ValidationError::EntryError {
-                    entry_id: entry.id.clone(),
-                    message: format!("Invalid internet check '{}': {}", check, e),
-                });
-            }
+            && let Err(e) = InternetCheckTarget::parse(check)
+        {
+            errors.push(ValidationError::EntryError {
+                entry_id: entry.id.clone(),
+                message: format!("Invalid internet check '{}': {}", check, e),
+            });
+        }
 
         if internet.required {
             let has_check = internet.check.is_some()
@@ -236,12 +241,8 @@ pub fn parse_time(s: &str) -> Result<(u8, u8), String> {
         return Err("Expected HH:MM format".into());
     }
 
-    let hour: u8 = parts[0]
-        .parse()
-        .map_err(|_| "Invalid hour".to_string())?;
-    let minute: u8 = parts[1]
-        .parse()
-        .map_err(|_| "Invalid minute".to_string())?;
+    let hour: u8 = parts[0].parse().map_err(|_| "Invalid hour".to_string())?;
+    let minute: u8 = parts[1].parse().map_err(|_| "Invalid minute".to_string())?;
 
     if hour >= 24 {
         return Err("Hour must be 0-23".into());
@@ -299,12 +300,23 @@ mod tests {
 
     #[test]
     fn test_parse_days() {
-        assert_eq!(parse_days(&RawDays::Preset("weekdays".into())).unwrap(), 0x1F);
-        assert_eq!(parse_days(&RawDays::Preset("weekends".into())).unwrap(), 0x60);
+        assert_eq!(
+            parse_days(&RawDays::Preset("weekdays".into())).unwrap(),
+            0x1F
+        );
+        assert_eq!(
+            parse_days(&RawDays::Preset("weekends".into())).unwrap(),
+            0x60
+        );
         assert_eq!(parse_days(&RawDays::Preset("all".into())).unwrap(), 0x7F);
 
         assert_eq!(
-            parse_days(&RawDays::List(vec!["mon".into(), "wed".into(), "fri".into()])).unwrap(),
+            parse_days(&RawDays::List(vec![
+                "mon".into(),
+                "wed".into(),
+                "fri".into()
+            ]))
+            .unwrap(),
             0b10101
         );
     }
@@ -355,6 +367,10 @@ mod tests {
         };
 
         let errors = validate_config(&config);
-        assert!(errors.iter().any(|e| matches!(e, ValidationError::DuplicateEntryId(_))));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::DuplicateEntryId(_)))
+        );
     }
 }

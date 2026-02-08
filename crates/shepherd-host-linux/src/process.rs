@@ -38,32 +38,32 @@ pub fn kill_snap_cgroup(snap_name: &str, _signal: Signal) -> bool {
         "/sys/fs/cgroup/user.slice/user-{}.slice/user@{}.service/app.slice",
         uid, uid
     );
-    
+
     // Find all scope directories matching this snap
     let pattern = format!("snap.{}.{}-", snap_name, snap_name);
-    
+
     let base = std::path::Path::new(&base_path);
     if !base.exists() {
         debug!(path = %base_path, "Snap cgroup base path doesn't exist");
         return false;
     }
-    
+
     let mut stopped_any = false;
-    
+
     if let Ok(entries) = std::fs::read_dir(base) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            
+
             if name_str.starts_with(&pattern) && name_str.ends_with(".scope") {
                 let scope_name = name_str.to_string();
-                
+
                 // Always use SIGKILL for snap apps to prevent self-restart behavior
                 // Using systemctl kill --signal=KILL sends SIGKILL to all processes in scope
                 let result = Command::new("systemctl")
                     .args(["--user", "kill", "--signal=KILL", &scope_name])
                     .output();
-                
+
                 match result {
                     Ok(output) => {
                         if output.status.success() {
@@ -81,13 +81,16 @@ pub fn kill_snap_cgroup(snap_name: &str, _signal: Signal) -> bool {
             }
         }
     }
-    
+
     if stopped_any {
-        info!(snap = snap_name, "Killed snap scope(s) via systemctl SIGKILL");
+        info!(
+            snap = snap_name,
+            "Killed snap scope(s) via systemctl SIGKILL"
+        );
     } else {
         debug!(snap = snap_name, "No snap scope found to kill");
     }
-    
+
     stopped_any
 }
 
@@ -101,33 +104,33 @@ pub fn kill_flatpak_cgroup(app_id: &str, _signal: Signal) -> bool {
         "/sys/fs/cgroup/user.slice/user-{}.slice/user@{}.service/app.slice",
         uid, uid
     );
-    
+
     // Flatpak uses a different naming pattern than snap
     // The app_id dots are preserved: app-flatpak-org.example.App-<number>.scope
     let pattern = format!("app-flatpak-{}-", app_id);
-    
+
     let base = std::path::Path::new(&base_path);
     if !base.exists() {
         debug!(path = %base_path, "Flatpak cgroup base path doesn't exist");
         return false;
     }
-    
+
     let mut stopped_any = false;
-    
+
     if let Ok(entries) = std::fs::read_dir(base) {
         for entry in entries.flatten() {
             let name = entry.file_name();
             let name_str = name.to_string_lossy();
-            
+
             if name_str.starts_with(&pattern) && name_str.ends_with(".scope") {
                 let scope_name = name_str.to_string();
-                
+
                 // Always use SIGKILL for flatpak apps to prevent self-restart behavior
                 // Using systemctl kill --signal=KILL sends SIGKILL to all processes in scope
                 let result = Command::new("systemctl")
                     .args(["--user", "kill", "--signal=KILL", &scope_name])
                     .output();
-                
+
                 match result {
                     Ok(output) => {
                         if output.status.success() {
@@ -145,13 +148,16 @@ pub fn kill_flatpak_cgroup(app_id: &str, _signal: Signal) -> bool {
             }
         }
     }
-    
+
     if stopped_any {
-        info!(app_id = app_id, "Killed flatpak scope(s) via systemctl SIGKILL");
+        info!(
+            app_id = app_id,
+            "Killed flatpak scope(s) via systemctl SIGKILL"
+        );
     } else {
         debug!(app_id = app_id, "No flatpak scope found to kill");
     }
-    
+
     stopped_any
 }
 
@@ -216,21 +222,28 @@ pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
         Signal::SIGKILL => "KILL",
         _ => "TERM",
     };
-    
+
     // Use pkill to find and kill processes by command name
     let result = Command::new("pkill")
         .args([&format!("-{}", signal_name), "-f", command_name])
         .output();
-    
+
     match result {
         Ok(output) => {
             // pkill returns 0 if processes were found and signaled
             if output.status.success() {
-                info!(command = command_name, signal = signal_name, "Killed processes by command name");
+                info!(
+                    command = command_name,
+                    signal = signal_name,
+                    "Killed processes by command name"
+                );
                 true
             } else {
                 // No processes found is not an error
-                debug!(command = command_name, "No processes found matching command name");
+                debug!(
+                    command = command_name,
+                    "No processes found matching command name"
+                );
                 false
             }
         }
@@ -243,10 +256,10 @@ pub fn kill_by_command(command_name: &str, signal: Signal) -> bool {
 
 impl ManagedProcess {
     /// Spawn a new process in its own process group
-    /// 
+    ///
     /// If `snap_name` is provided, the process is treated as a snap app and will use
     /// systemd scope-based killing instead of signal-based killing.
-    /// 
+    ///
     /// If `log_path` is provided, stdout and stderr will be redirected to that file.
     /// For snap apps, we use `script` to capture output from all child processes
     /// via a pseudo-terminal, since snap child processes don't inherit file descriptors.
@@ -272,15 +285,16 @@ impl ManagedProcess {
                 {
                     warn!(path = %parent.display(), error = %e, "Failed to create log directory");
                 }
-                
+
                 // Build command: script -q -c "original command" logfile
                 // -q: quiet mode (no start/done messages)
                 // -c: command to run
-                let original_cmd = argv.iter()
+                let original_cmd = argv
+                    .iter()
                     .map(|arg| shell_escape::escape(std::borrow::Cow::Borrowed(arg)))
                     .collect::<Vec<_>>()
                     .join(" ");
-                
+
                 let script_argv = vec![
                     "script".to_string(),
                     "-q".to_string(),
@@ -288,7 +302,7 @@ impl ManagedProcess {
                     original_cmd,
                     log_file.to_string_lossy().to_string(),
                 ];
-                
+
                 info!(log_path = %log_file.display(), "Using script to capture snap output via pty");
                 (script_argv, None) // script handles the log file itself
             }
@@ -303,7 +317,7 @@ impl ManagedProcess {
 
         // Set environment
         cmd.env_clear();
-        
+
         // Inherit essential environment variables
         // These are needed for most Linux applications to work correctly
         let inherit_vars = [
@@ -369,7 +383,7 @@ impl ManagedProcess {
             "DESKTOP_SESSION",
             "GNOME_DESKTOP_SESSION_ID",
         ];
-        
+
         for var in inherit_vars {
             if let Ok(val) = std::env::var(var) {
                 cmd.env(var, val);
@@ -415,7 +429,7 @@ impl ManagedProcess {
             {
                 warn!(path = %parent.display(), error = %e, "Failed to create log directory");
             }
-            
+
             // Open log file for appending (create if doesn't exist)
             match File::create(path) {
                 Ok(file) => {
@@ -465,37 +479,41 @@ impl ManagedProcess {
         // SAFETY: This is safe in the pre-exec context
         unsafe {
             cmd.pre_exec(|| {
-                nix::unistd::setsid().map_err(|e| {
-                    std::io::Error::other(e.to_string())
-                })?;
+                nix::unistd::setsid().map_err(|e| std::io::Error::other(e.to_string()))?;
                 Ok(())
             });
         }
 
-        let child = cmd.spawn().map_err(|e| {
-            HostError::SpawnFailed(format!("Failed to spawn {}: {}", program, e))
-        })?;
+        let child = cmd
+            .spawn()
+            .map_err(|e| HostError::SpawnFailed(format!("Failed to spawn {}: {}", program, e)))?;
 
         let pid = child.id();
         let pgid = pid; // After setsid, pid == pgid
-        
+
         info!(pid = pid, pgid = pgid, program = %program, snap = ?snap_name, "Process spawned");
 
-        Ok(Self { child, pid, pgid, command_name, snap_name })
+        Ok(Self {
+            child,
+            pid,
+            pgid,
+            command_name,
+            snap_name,
+        })
     }
 
     /// Get all descendant PIDs of this process using /proc
     fn get_descendant_pids(&self) -> Vec<i32> {
         let mut descendants = Vec::new();
         let mut to_check = vec![self.pid as i32];
-        
+
         while let Some(parent_pid) = to_check.pop() {
             // Read /proc to find children of this PID
             if let Ok(entries) = std::fs::read_dir("/proc") {
                 for entry in entries.flatten() {
                     let name = entry.file_name();
                     let name_str = name.to_string_lossy();
-                    
+
                     // Skip non-numeric entries (not PIDs)
                     if let Ok(pid) = name_str.parse::<i32>() {
                         // Read the stat file to get parent PID
@@ -508,17 +526,18 @@ impl ManagedProcess {
                                 let fields: Vec<&str> = after_comm.split_whitespace().collect();
                                 if fields.len() >= 2
                                     && let Ok(ppid) = fields[1].parse::<i32>()
-                                    && ppid == parent_pid {
-                                        descendants.push(pid);
-                                        to_check.push(pid);
-                                    }
+                                    && ppid == parent_pid
+                                {
+                                    descendants.push(pid);
+                                    to_check.push(pid);
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        
+
         descendants
     }
 
@@ -529,7 +548,7 @@ impl ManagedProcess {
         if self.snap_name.is_none() {
             kill_by_command(&self.command_name, Signal::SIGTERM);
         }
-        
+
         // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32)); // Negative for process group
 
@@ -544,7 +563,7 @@ impl ManagedProcess {
                 debug!(pgid = self.pgid, error = %e, "Failed to send SIGTERM to process group");
             }
         }
-        
+
         // Also kill all descendants (they may have escaped the process group)
         let descendants = self.get_descendant_pids();
         for pid in &descendants {
@@ -553,7 +572,7 @@ impl ManagedProcess {
         if !descendants.is_empty() {
             debug!(descendants = ?descendants, "Sent SIGTERM to descendant processes");
         }
-        
+
         Ok(())
     }
 
@@ -564,7 +583,7 @@ impl ManagedProcess {
         if self.snap_name.is_none() {
             kill_by_command(&self.command_name, Signal::SIGKILL);
         }
-        
+
         // Also try to kill the process group
         let pgid = Pid::from_raw(-(self.pgid as i32));
 
@@ -579,7 +598,7 @@ impl ManagedProcess {
                 debug!(pgid = self.pgid, error = %e, "Failed to send SIGKILL to process group");
             }
         }
-        
+
         // Also kill all descendants (they may have escaped the process group)
         let descendants = self.get_descendant_pids();
         for pid in &descendants {
@@ -588,7 +607,7 @@ impl ManagedProcess {
         if !descendants.is_empty() {
             debug!(descendants = ?descendants, "Sent SIGKILL to descendant processes");
         }
-        
+
         Ok(())
     }
 
@@ -647,7 +666,7 @@ impl ManagedProcess {
             Err(e) => Err(HostError::Internal(format!("Wait failed: {}", e))),
         }
     }
-    
+
     /// Clean up resources associated with this process
     pub fn cleanup(&self) {
         // Nothing to clean up for systemd scopes - systemd handles it

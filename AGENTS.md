@@ -2,7 +2,9 @@ Agents: please use the existing documentation for setup.
 
 <CONTRIBUTING.md> describes environment setup and build, test, and lint, including helper scripts and exact commands.
 
-Please ensure that your changes build and pass tests and lint. If you changed the example configuration at <config.example.toml>, make sure that it passes config validation.
+Please ensure that your changes build and pass tests and lint, and run `cargo fmt --all` to match your changes to the rest of the code.
+
+If you changed the example configuration at <config.example.toml>, make sure that it passes config validation.
 
 Each of the Rust crates in <crates> contains a README.md that describes each at a high level.
 

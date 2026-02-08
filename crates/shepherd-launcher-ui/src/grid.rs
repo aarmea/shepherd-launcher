@@ -51,7 +51,8 @@ mod imp {
 
             // Configure flow box
             self.flow_box.set_homogeneous(true);
-            self.flow_box.set_selection_mode(gtk4::SelectionMode::None);
+            self.flow_box
+                .set_selection_mode(gtk4::SelectionMode::Single);
             self.flow_box.set_max_children_per_line(6);
             self.flow_box.set_min_children_per_line(2);
             self.flow_box.set_row_spacing(24);
@@ -60,6 +61,7 @@ mod imp {
             self.flow_box.set_valign(gtk4::Align::Center);
             self.flow_box.set_hexpand(true);
             self.flow_box.set_vexpand(true);
+            self.flow_box.set_focusable(true);
             self.flow_box.add_css_class("launcher-grid");
 
             // Wrap in a scrolled window
@@ -117,20 +119,131 @@ impl LauncherGrid {
             let on_launch = imp.on_launch.clone();
             tile.connect_clicked(move |tile| {
                 if let Some(entry_id) = tile.entry_id()
-                    && let Some(callback) = on_launch.borrow().as_ref() {
-                        callback(entry_id);
-                    }
+                    && let Some(callback) = on_launch.borrow().as_ref()
+                {
+                    callback(entry_id);
+                }
             });
 
             imp.flow_box.insert(&tile, -1);
             imp.tiles.borrow_mut().push(tile);
         }
+
+        self.select_first();
     }
 
     /// Enable or disable all tiles
     pub fn set_tiles_sensitive(&self, sensitive: bool) {
         for tile in self.imp().tiles.borrow().iter() {
             tile.set_sensitive(sensitive);
+        }
+    }
+
+    pub fn select_first(&self) {
+        let imp = self.imp();
+        if let Some(child) = imp.flow_box.child_at_index(0) {
+            imp.flow_box.select_child(&child);
+            child.grab_focus();
+        }
+    }
+
+    pub fn move_selection(&self, dx: i32, dy: i32) {
+        let imp = self.imp();
+        if imp.tiles.borrow().is_empty() {
+            return;
+        }
+
+        let current_child = imp
+            .flow_box
+            .selected_children()
+            .first()
+            .cloned()
+            .or_else(|| imp.flow_box.child_at_index(0));
+        let Some(current_child) = current_child else {
+            return;
+        };
+
+        let current_alloc = current_child.allocation();
+        let current_x = current_alloc.x();
+        let current_y = current_alloc.y();
+        let mut best: Option<(gtk4::FlowBoxChild, i32, i32)> = None;
+
+        let tile_count = imp.tiles.borrow().len() as i32;
+        for idx in 0..tile_count {
+            let Some(candidate) = imp.flow_box.child_at_index(idx) else {
+                continue;
+            };
+            if candidate == current_child {
+                continue;
+            }
+
+            let alloc = candidate.allocation();
+            let x = alloc.x();
+            let y = alloc.y();
+
+            let is_direction_match = match (dx, dy) {
+                (-1, 0) => y == current_y && x < current_x,
+                (1, 0) => y == current_y && x > current_x,
+                (0, -1) => y < current_y,
+                (0, 1) => y > current_y,
+                _ => false,
+            };
+            if !is_direction_match {
+                continue;
+            }
+
+            let primary_dist = match (dx, dy) {
+                (-1, 0) | (1, 0) => (x - current_x).abs(),
+                (0, -1) | (0, 1) => (y - current_y).abs(),
+                _ => i32::MAX,
+            };
+            let secondary_dist = match (dx, dy) {
+                (-1, 0) | (1, 0) => (y - current_y).abs(),
+                (0, -1) | (0, 1) => (x - current_x).abs(),
+                _ => i32::MAX,
+            };
+
+            let replace = match best {
+                None => true,
+                Some((_, best_primary, best_secondary)) => {
+                    primary_dist < best_primary
+                        || (primary_dist == best_primary && secondary_dist < best_secondary)
+                }
+            };
+
+            if replace {
+                best = Some((candidate, primary_dist, secondary_dist));
+            }
+        }
+
+        if let Some((child, _, _)) = best {
+            imp.flow_box.select_child(&child);
+            child.grab_focus();
+        }
+    }
+
+    pub fn launch_selected(&self) {
+        let imp = self.imp();
+        let maybe_child = imp.flow_box.selected_children().first().cloned();
+        let Some(child) = maybe_child else {
+            return;
+        };
+
+        let index = child.index();
+        if index < 0 {
+            return;
+        }
+
+        let tile = imp.tiles.borrow().get(index as usize).cloned();
+        if let Some(tile) = tile {
+            if !tile.is_sensitive() {
+                return;
+            }
+            if let Some(entry_id) = tile.entry_id()
+                && let Some(callback) = imp.on_launch.borrow().as_ref()
+            {
+                callback(entry_id);
+            }
         }
     }
 }

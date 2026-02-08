@@ -1,7 +1,7 @@
 //! SQLite-based store implementation
 
 use chrono::{DateTime, Local, NaiveDate};
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use shepherd_util::EntryId;
 use std::path::Path;
 use std::sync::Mutex;
@@ -98,9 +98,8 @@ impl Store for SqliteStore {
     fn get_recent_audits(&self, limit: usize) -> StoreResult<Vec<AuditEvent>> {
         let conn = self.conn.lock().unwrap();
 
-        let mut stmt = conn.prepare(
-            "SELECT id, timestamp, event_json FROM audit_log ORDER BY id DESC LIMIT ?",
-        )?;
+        let mut stmt = conn
+            .prepare("SELECT id, timestamp, event_json FROM audit_log ORDER BY id DESC LIMIT ?")?;
 
         let rows = stmt.query_map([limit], |row| {
             let id: i64 = row.get(0)?;
@@ -181,11 +180,7 @@ impl Store for SqliteStore {
         Ok(result)
     }
 
-    fn set_cooldown_until(
-        &self,
-        entry_id: &EntryId,
-        until: DateTime<Local>,
-    ) -> StoreResult<()> {
+    fn set_cooldown_until(&self, entry_id: &EntryId, until: DateTime<Local>) -> StoreResult<()> {
         let conn = self.conn.lock().unwrap();
 
         conn.execute(
@@ -204,7 +199,10 @@ impl Store for SqliteStore {
 
     fn clear_cooldown(&self, entry_id: &EntryId) -> StoreResult<()> {
         let conn = self.conn.lock().unwrap();
-        conn.execute("DELETE FROM cooldowns WHERE entry_id = ?", [entry_id.as_str()])?;
+        conn.execute(
+            "DELETE FROM cooldowns WHERE entry_id = ?",
+            [entry_id.as_str()],
+        )?;
         Ok(())
     }
 
@@ -212,9 +210,11 @@ impl Store for SqliteStore {
         let conn = self.conn.lock().unwrap();
 
         let json: Option<String> = conn
-            .query_row("SELECT snapshot_json FROM snapshot WHERE id = 1", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT snapshot_json FROM snapshot WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
             .optional()?;
 
         match json {
@@ -246,9 +246,7 @@ impl Store for SqliteStore {
 
     fn is_healthy(&self) -> bool {
         match self.conn.lock() {
-            Ok(conn) => {
-                conn.query_row("SELECT 1", [], |_| Ok(())).is_ok()
-            }
+            Ok(conn) => conn.query_row("SELECT 1", [], |_| Ok(())).is_ok(),
             Err(_) => {
                 warn!("Store lock poisoned");
                 false

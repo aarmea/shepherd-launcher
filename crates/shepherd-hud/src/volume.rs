@@ -60,9 +60,7 @@ pub fn toggle_mute() -> anyhow::Result<()> {
             shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
                 Err(anyhow::anyhow!("Volume denied: {}", reason))
             }
-            shepherd_api::ResponseResult::Err(e) => {
-                Err(anyhow::anyhow!("Error: {}", e.message))
-            }
+            shepherd_api::ResponseResult::Err(e) => Err(anyhow::anyhow!("Error: {}", e.message)),
             _ => Err(anyhow::anyhow!("Unexpected response")),
         }
     })
@@ -83,9 +81,7 @@ pub fn set_volume(percent: u8) -> anyhow::Result<()> {
             shepherd_api::ResponseResult::Ok(ResponsePayload::VolumeDenied { reason }) => {
                 Err(anyhow::anyhow!("Volume denied: {}", reason))
             }
-            shepherd_api::ResponseResult::Err(e) => {
-                Err(anyhow::anyhow!("Error: {}", e.message))
-            }
+            shepherd_api::ResponseResult::Err(e) => Err(anyhow::anyhow!("Error: {}", e.message)),
             _ => Err(anyhow::anyhow!("Unexpected response")),
         }
     })

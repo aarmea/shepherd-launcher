@@ -18,7 +18,10 @@ pub struct HostSessionHandle {
 
 impl HostSessionHandle {
     pub fn new(session_id: SessionId, payload: HostHandlePayload) -> Self {
-        Self { session_id, payload }
+        Self {
+            session_id,
+            payload,
+        }
     }
 
     pub fn payload(&self) -> &HostHandlePayload {
@@ -31,27 +34,16 @@ impl HostSessionHandle {
 #[serde(tag = "platform", rename_all = "snake_case")]
 pub enum HostHandlePayload {
     /// Linux: process group ID
-    Linux {
-        pid: u32,
-        pgid: u32,
-    },
+    Linux { pid: u32, pgid: u32 },
 
     /// Windows: job object handle (serialized as name/id)
-    Windows {
-        job_name: String,
-        process_id: u32,
-    },
+    Windows { job_name: String, process_id: u32 },
 
     /// macOS: bundle or process identifier
-    MacOs {
-        pid: u32,
-        bundle_id: Option<String>,
-    },
+    MacOs { pid: u32, bundle_id: Option<String> },
 
     /// Mock for testing
-    Mock {
-        id: u64,
-    },
+    Mock { id: u64 },
 }
 
 impl HostHandlePayload {
@@ -117,7 +109,10 @@ mod tests {
     fn handle_serialization() {
         let handle = HostSessionHandle::new(
             SessionId::new(),
-            HostHandlePayload::Linux { pid: 1234, pgid: 1234 },
+            HostHandlePayload::Linux {
+                pid: 1234,
+                pgid: 1234,
+            },
         );
 
         let json = serde_json::to_string(&handle).unwrap();

@@ -4,9 +4,10 @@ use gtk4::glib;
 use gtk4::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 use crate::client::{CommandClient, ServiceClient};
 use crate::grid::LauncherGrid;
@@ -39,6 +40,13 @@ window {
     background: #1f3460;
     background-color: #1f3460;
     border-color: #4a90d9;
+}
+
+.launcher-tile:focus,
+.launcher-tile:focus-visible {
+    background: #1f3460;
+    background-color: #1f3460;
+    border-color: #ffd166;
 }
 
 .launcher-tile:active {
@@ -168,6 +176,14 @@ impl LauncherApp {
 
         // Create command client for sending commands
         let command_client = Arc::new(CommandClient::new(&socket_path));
+        Self::setup_keyboard_input(&window, &grid);
+        Self::setup_gamepad_input(
+            &window,
+            &grid,
+            command_client.clone(),
+            runtime.clone(),
+            state.clone(),
+        );
 
         // Connect grid launch callback
         let cmd_client = command_client.clone();
@@ -296,7 +312,8 @@ impl LauncherApp {
         let state_for_client = state.clone();
         let socket_for_client = socket_path.clone();
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime for event loop");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("Failed to create tokio runtime for event loop");
             rt.block_on(async move {
                 let client = ServiceClient::new(socket_for_client, state_for_client, command_rx);
                 client.run().await;
@@ -342,6 +359,7 @@ impl LauncherApp {
                         if let Some(grid) = grid {
                             grid.set_entries(entries);
                             grid.set_tiles_sensitive(true);
+                            grid.grab_focus();
                         }
                         if let Some(ref win) = window {
                             win.set_visible(true);
@@ -379,6 +397,199 @@ impl LauncherApp {
         });
 
         window.present();
+    }
+
+    fn setup_keyboard_input(window: &gtk4::ApplicationWindow, grid: &LauncherGrid) {
+        let key_controller = gtk4::EventControllerKey::new();
+        key_controller.set_propagation_phase(gtk4::PropagationPhase::Capture);
+        let grid_weak = grid.downgrade();
+        key_controller.connect_key_pressed(move |_, key, _, _| {
+            let Some(grid) = grid_weak.upgrade() else {
+                return glib::Propagation::Proceed;
+            };
+
+            let handled = match key {
+                gtk4::gdk::Key::Up | gtk4::gdk::Key::w | gtk4::gdk::Key::W => {
+                    grid.move_selection(0, -1);
+                    true
+                }
+                gtk4::gdk::Key::Down | gtk4::gdk::Key::s | gtk4::gdk::Key::S => {
+                    grid.move_selection(0, 1);
+                    true
+                }
+                gtk4::gdk::Key::Left | gtk4::gdk::Key::a | gtk4::gdk::Key::A => {
+                    grid.move_selection(-1, 0);
+                    true
+                }
+                gtk4::gdk::Key::Right | gtk4::gdk::Key::d | gtk4::gdk::Key::D => {
+                    grid.move_selection(1, 0);
+                    true
+                }
+                gtk4::gdk::Key::Return | gtk4::gdk::Key::KP_Enter | gtk4::gdk::Key::space => {
+                    grid.launch_selected();
+                    true
+                }
+                _ => false,
+            };
+
+            if handled {
+                glib::Propagation::Stop
+            } else {
+                glib::Propagation::Proceed
+            }
+        });
+        window.add_controller(key_controller);
+    }
+
+    fn setup_gamepad_input(
+        _window: &gtk4::ApplicationWindow,
+        grid: &LauncherGrid,
+        command_client: Arc<CommandClient>,
+        runtime: Arc<Runtime>,
+        state: SharedState,
+    ) {
+        let mut gilrs = match gilrs::Gilrs::new() {
+            Ok(gilrs) => gilrs,
+            Err(e) => {
+                warn!(error = %e, "Gamepad input unavailable");
+                return;
+            }
+        };
+
+        let grid_weak = grid.downgrade();
+        let cmd_client = command_client.clone();
+        let rt = runtime.clone();
+        let state_clone = state.clone();
+        let mut axis_state = GamepadAxisState::default();
+
+        glib::timeout_add_local(Duration::from_millis(16), move || {
+            while let Some(event) = gilrs.next_event() {
+                let Some(grid) = grid_weak.upgrade() else {
+                    return glib::ControlFlow::Break;
+                };
+
+                match event.event {
+                    gilrs::EventType::ButtonPressed(button, _) => match button {
+                        gilrs::Button::DPadUp => grid.move_selection(0, -1),
+                        gilrs::Button::DPadDown => grid.move_selection(0, 1),
+                        gilrs::Button::DPadLeft => grid.move_selection(-1, 0),
+                        gilrs::Button::DPadRight => grid.move_selection(1, 0),
+                        gilrs::Button::South | gilrs::Button::East | gilrs::Button::Start => {
+                            grid.launch_selected();
+                        }
+                        gilrs::Button::Mode => {
+                            Self::request_stop_current(
+                                cmd_client.clone(),
+                                rt.clone(),
+                                state_clone.clone(),
+                            );
+                        }
+                        _ => {}
+                    },
+                    gilrs::EventType::AxisChanged(axis, value, _) => {
+                        Self::handle_gamepad_axis(&grid, axis, value, &mut axis_state);
+                    }
+                    _ => {}
+                }
+            }
+
+            glib::ControlFlow::Continue
+        });
+    }
+
+    fn request_stop_current(
+        command_client: Arc<CommandClient>,
+        runtime: Arc<Runtime>,
+        state: SharedState,
+    ) {
+        runtime.spawn(async move {
+            match command_client.stop_current().await {
+                Ok(response) => match response.result {
+                    shepherd_api::ResponseResult::Ok(shepherd_api::ResponsePayload::Stopped) => {
+                        info!("StopCurrent acknowledged");
+                    }
+                    shepherd_api::ResponseResult::Err(err) => {
+                        debug!(error = %err.message, "StopCurrent request denied");
+                    }
+                    _ => {
+                        debug!("Unexpected StopCurrent response payload");
+                    }
+                },
+                Err(e) => {
+                    error!(error = %e, "StopCurrent request failed");
+                    state.set(LauncherState::Error {
+                        message: format!("Failed to stop current activity: {}", e),
+                    });
+                }
+            }
+        });
+    }
+
+    fn handle_gamepad_axis(
+        grid: &LauncherGrid,
+        axis: gilrs::Axis,
+        value: f32,
+        axis_state: &mut GamepadAxisState,
+    ) {
+        const THRESHOLD: f32 = 0.65;
+
+        match axis {
+            gilrs::Axis::LeftStickX | gilrs::Axis::DPadX => {
+                if value <= -THRESHOLD {
+                    if !axis_state.left {
+                        grid.move_selection(-1, 0);
+                    }
+                    axis_state.left = true;
+                    axis_state.right = false;
+                } else if value >= THRESHOLD {
+                    if !axis_state.right {
+                        grid.move_selection(1, 0);
+                    }
+                    axis_state.right = true;
+                    axis_state.left = false;
+                } else {
+                    axis_state.left = false;
+                    axis_state.right = false;
+                }
+            }
+            gilrs::Axis::LeftStickY => {
+                if value <= -THRESHOLD {
+                    if !axis_state.down {
+                        grid.move_selection(0, 1);
+                    }
+                    axis_state.down = true;
+                    axis_state.up = false;
+                } else if value >= THRESHOLD {
+                    if !axis_state.up {
+                        grid.move_selection(0, -1);
+                    }
+                    axis_state.up = true;
+                    axis_state.down = false;
+                } else {
+                    axis_state.up = false;
+                    axis_state.down = false;
+                }
+            }
+            gilrs::Axis::DPadY => {
+                if value <= -THRESHOLD {
+                    if !axis_state.up {
+                        grid.move_selection(0, -1);
+                    }
+                    axis_state.up = true;
+                    axis_state.down = false;
+                } else if value >= THRESHOLD {
+                    if !axis_state.down {
+                        grid.move_selection(0, 1);
+                    }
+                    axis_state.down = true;
+                    axis_state.up = false;
+                } else {
+                    axis_state.up = false;
+                    axis_state.down = false;
+                }
+            }
+            _ => {}
+        }
     }
 
     fn create_loading_view() -> gtk4::Box {
@@ -457,4 +668,12 @@ impl LauncherApp {
 
         (container, retry_button)
     }
+}
+
+#[derive(Default)]
+struct GamepadAxisState {
+    left: bool,
+    right: bool,
+    up: bool,
+    down: bool,
 }

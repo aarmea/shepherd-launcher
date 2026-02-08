@@ -120,6 +120,46 @@ jobs:
           . "$HOME/.cargo/env"
           cargo clippy --all-targets -- -D warnings
 
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    container:
+      image: ubuntu:25.10
+    steps:
+      - name: Install git
+        run: |
+          apt-get update
+          apt-get install -y git curl
+
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: ./scripts/shepherd deps install build
+
+      - name: Add rustfmt component
+        run: |
+          . "$HOME/.cargo/env"
+          rustup component add rustfmt
+
+      - name: Add Rust to PATH
+        run: echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Cache cargo registry and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Check formatting
+        run: |
+          . "$HOME/.cargo/env"
+          cargo fmt --all -- --check
+
   shellcheck:
     name: ShellCheck
     runs-on: ubuntu-latest

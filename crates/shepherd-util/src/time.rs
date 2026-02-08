@@ -37,7 +37,9 @@ fn get_mock_time_offset() -> Option<chrono::Duration> {
         {
             if let Ok(mock_time_str) = std::env::var(MOCK_TIME_ENV_VAR) {
                 // Parse the mock time string
-                if let Ok(naive_dt) = NaiveDateTime::parse_from_str(&mock_time_str, "%Y-%m-%d %H:%M:%S") {
+                if let Ok(naive_dt) =
+                    NaiveDateTime::parse_from_str(&mock_time_str, "%Y-%m-%d %H:%M:%S")
+                {
                     if let Some(mock_dt) = Local.from_local_datetime(&naive_dt).single() {
                         let real_now = chrono::Local::now();
                         let offset = mock_dt.signed_duration_since(real_now);
@@ -83,7 +85,7 @@ pub fn is_mock_time_active() -> bool {
 #[allow(clippy::disallowed_methods)] // This is the wrapper that provides mock time support
 pub fn now() -> DateTime<Local> {
     let real_now = chrono::Local::now();
-    
+
     if let Some(offset) = get_mock_time_offset() {
         real_now + offset
     } else {
@@ -201,9 +203,8 @@ impl DaysOfWeek {
     pub const SATURDAY: u8 = 1 << 5;
     pub const SUNDAY: u8 = 1 << 6;
 
-    pub const WEEKDAYS: DaysOfWeek = DaysOfWeek(
-        Self::MONDAY | Self::TUESDAY | Self::WEDNESDAY | Self::THURSDAY | Self::FRIDAY,
-    );
+    pub const WEEKDAYS: DaysOfWeek =
+        DaysOfWeek(Self::MONDAY | Self::TUESDAY | Self::WEDNESDAY | Self::THURSDAY | Self::FRIDAY);
     pub const WEEKENDS: DaysOfWeek = DaysOfWeek(Self::SATURDAY | Self::SUNDAY);
     pub const ALL_DAYS: DaysOfWeek = DaysOfWeek(0x7F);
     pub const NONE: DaysOfWeek = DaysOfWeek(0);
@@ -446,14 +447,14 @@ mod tests {
     fn test_parse_mock_time_invalid_formats() {
         // Test that invalid formats are rejected
         let invalid_formats = [
-            "2025-12-25",           // Missing time
-            "14:30:00",             // Missing date
-            "2025/12/25 14:30:00",  // Wrong date separator
-            "2025-12-25T14:30:00",  // ISO format (not supported)
-            "Dec 25, 2025 14:30",   // Wrong format
-            "25-12-2025 14:30:00",  // Wrong date order
-            "",                     // Empty string
-            "not a date",           // Invalid string
+            "2025-12-25",          // Missing time
+            "14:30:00",            // Missing date
+            "2025/12/25 14:30:00", // Wrong date separator
+            "2025-12-25T14:30:00", // ISO format (not supported)
+            "Dec 25, 2025 14:30",  // Wrong format
+            "25-12-2025 14:30:00", // Wrong date order
+            "",                    // Empty string
+            "not a date",          // Invalid string
         ];
 
         for format_str in &invalid_formats {
@@ -474,12 +475,12 @@ mod tests {
         let naive_dt = NaiveDateTime::parse_from_str(mock_time_str, "%Y-%m-%d %H:%M:%S").unwrap();
         let mock_dt = Local.from_local_datetime(&naive_dt).single().unwrap();
         let real_now = chrono::Local::now();
-        
+
         let offset = mock_dt.signed_duration_since(real_now);
-        
+
         // The offset should be applied correctly
         let simulated_now = real_now + offset;
-        
+
         // The simulated time should be very close to the mock time
         // (within a second, accounting for test execution time)
         let diff = (simulated_now - mock_dt).num_seconds().abs();
@@ -495,25 +496,25 @@ mod tests {
     fn test_mock_time_advances_with_real_time() {
         // Test that mock time advances at the same rate as real time
         // This tests the concept, not the actual implementation (since OnceLock is static)
-        
+
         let mock_time_str = "2025-12-25 14:30:00";
         let naive_dt = NaiveDateTime::parse_from_str(mock_time_str, "%Y-%m-%d %H:%M:%S").unwrap();
         let mock_dt = Local.from_local_datetime(&naive_dt).single().unwrap();
-        
+
         let real_t1 = chrono::Local::now();
         let offset = mock_dt.signed_duration_since(real_t1);
-        
+
         // Simulate time passing
         std::thread::sleep(Duration::from_millis(100));
-        
+
         let real_t2 = chrono::Local::now();
         let simulated_t1 = real_t1 + offset;
         let simulated_t2 = real_t2 + offset;
-        
+
         // The simulated times should have advanced by the same amount as real times
         let real_elapsed = real_t2.signed_duration_since(real_t1);
         let simulated_elapsed = simulated_t2.signed_duration_since(simulated_t1);
-        
+
         assert_eq!(
             real_elapsed.num_milliseconds(),
             simulated_elapsed.num_milliseconds(),
@@ -525,24 +526,33 @@ mod tests {
     fn test_availability_with_specific_time() {
         // Test that availability windows work correctly with a specific time
         // This validates that the mock time would affect availability checks
-        
+
         let window = TimeWindow::new(
             DaysOfWeek::ALL_DAYS,
-            WallClock::new(14, 0).unwrap(),  // 2 PM
-            WallClock::new(18, 0).unwrap(),  // 6 PM
+            WallClock::new(14, 0).unwrap(), // 2 PM
+            WallClock::new(18, 0).unwrap(), // 6 PM
         );
-        
+
         // Time within window
         let in_window = Local.with_ymd_and_hms(2025, 12, 25, 15, 0, 0).unwrap();
-        assert!(window.contains(&in_window), "15:00 should be within 14:00-18:00 window");
-        
+        assert!(
+            window.contains(&in_window),
+            "15:00 should be within 14:00-18:00 window"
+        );
+
         // Time before window
         let before_window = Local.with_ymd_and_hms(2025, 12, 25, 10, 0, 0).unwrap();
-        assert!(!window.contains(&before_window), "10:00 should be before 14:00-18:00 window");
-        
+        assert!(
+            !window.contains(&before_window),
+            "10:00 should be before 14:00-18:00 window"
+        );
+
         // Time after window
         let after_window = Local.with_ymd_and_hms(2025, 12, 25, 20, 0, 0).unwrap();
-        assert!(!window.contains(&after_window), "20:00 should be after 14:00-18:00 window");
+        assert!(
+            !window.contains(&after_window),
+            "20:00 should be after 14:00-18:00 window"
+        );
     }
 
     #[test]
@@ -553,18 +563,27 @@ mod tests {
             WallClock::new(14, 0).unwrap(),
             WallClock::new(18, 0).unwrap(),
         );
-        
+
         // Thursday at 3 PM - should be available (weekday, in time window)
         let thursday = Local.with_ymd_and_hms(2025, 12, 25, 15, 0, 0).unwrap(); // Christmas 2025 is Thursday
-        assert!(window.contains(&thursday), "Thursday 15:00 should be in weekday afternoon window");
-        
+        assert!(
+            window.contains(&thursday),
+            "Thursday 15:00 should be in weekday afternoon window"
+        );
+
         // Saturday at 3 PM - should NOT be available (weekend)
         let saturday = Local.with_ymd_and_hms(2025, 12, 27, 15, 0, 0).unwrap();
-        assert!(!window.contains(&saturday), "Saturday should not be in weekday window");
-        
+        assert!(
+            !window.contains(&saturday),
+            "Saturday should not be in weekday window"
+        );
+
         // Sunday at 3 PM - should NOT be available (weekend)
         let sunday = Local.with_ymd_and_hms(2025, 12, 28, 15, 0, 0).unwrap();
-        assert!(!window.contains(&sunday), "Sunday should not be in weekday window");
+        assert!(
+            !window.contains(&sunday),
+            "Sunday should not be in weekday window"
+        );
     }
 }
 
@@ -577,7 +596,7 @@ mod mock_time_integration_tests {
     /// This test documents the expected behavior of the mock time feature.
     /// Due to the static OnceLock, actual integration testing requires
     /// running with the environment variable set externally.
-    /// 
+    ///
     /// To manually test:
     /// ```bash
     /// SHEPHERD_MOCK_TIME="2025-12-25 14:30:00" cargo test
@@ -586,7 +605,7 @@ mod mock_time_integration_tests {
     fn test_mock_time_documentation() {
         // This test verifies the mock time constants and expected behavior
         assert_eq!(MOCK_TIME_ENV_VAR, "SHEPHERD_MOCK_TIME");
-        
+
         // The expected format is documented
         let expected_format = "%Y-%m-%d %H:%M:%S";
         let example = "2025-12-25 14:30:00";
@@ -608,10 +627,10 @@ mod mock_time_integration_tests {
         let t1 = now();
         std::thread::sleep(Duration::from_millis(50));
         let t2 = now();
-        
+
         // t2 should be after t1
         assert!(t2 > t1, "Time should advance forward");
-        
+
         // The difference should be approximately 50ms (with some tolerance)
         let diff = t2.signed_duration_since(t1);
         assert!(

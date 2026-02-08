@@ -65,8 +65,9 @@ impl InternetCheckTarget {
         let (host, port_opt) = parse_host_port(host_port)?;
 
         let port = match scheme {
-            InternetCheckScheme::Tcp => port_opt
-                .ok_or_else(|| "tcp check requires explicit port".to_string())?,
+            InternetCheckScheme::Tcp => {
+                port_opt.ok_or_else(|| "tcp check requires explicit port".to_string())?
+            }
             _ => port_opt.unwrap_or_else(|| scheme.default_port()),
         };
 
@@ -149,4 +150,3 @@ pub struct EntryInternetPolicy {
     pub required: bool,
     pub check: Option<InternetCheckTarget>,
 }
-

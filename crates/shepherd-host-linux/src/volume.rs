@@ -148,9 +148,10 @@ impl LinuxVolumeController {
 
             // Output: "Volume: front-left: 65536 / 100% / -0.00 dB, front-right: ..."
             if let Some(percent_str) = stdout.split('/').nth(1)
-                && let Ok(percent) = percent_str.trim().trim_end_matches('%').parse::<u8>() {
-                    status.percent = percent;
-                }
+                && let Ok(percent) = percent_str.trim().trim_end_matches('%').parse::<u8>()
+            {
+                status.percent = percent;
+            }
         }
 
         // Check mute status
@@ -185,9 +186,10 @@ impl LinuxVolumeController {
                 // Extract percentage: [100%]
                 if let Some(start) = line.find('[')
                     && let Some(end) = line[start..].find('%')
-                    && let Ok(percent) = line[start + 1..start + end].parse::<u8>() {
-                        status.percent = percent;
-                    }
+                    && let Ok(percent) = line[start + 1..start + end].parse::<u8>()
+                {
+                    status.percent = percent;
+                }
                 // Check mute status: [on] or [off]
                 status.muted = line.contains("[off]");
                 break;
@@ -210,7 +212,11 @@ impl LinuxVolumeController {
     /// Set volume via PulseAudio
     fn set_volume_pulseaudio(percent: u8) -> VolumeResult<()> {
         Command::new("pactl")
-            .args(["set-sink-volume", "@DEFAULT_SINK@", &format!("{}%", percent)])
+            .args([
+                "set-sink-volume",
+                "@DEFAULT_SINK@",
+                &format!("{}%", percent),
+            ])
             .status()
             .map_err(|e| VolumeError::Backend(e.to_string()))?;
         Ok(())
@@ -323,7 +329,10 @@ impl VolumeController for LinuxVolumeController {
 
     async fn volume_up(&self, step: u8) -> VolumeResult<()> {
         let current = self.get_status().await?;
-        let new_volume = current.percent.saturating_add(step).min(self.capabilities.max_volume);
+        let new_volume = current
+            .percent
+            .saturating_add(step)
+            .min(self.capabilities.max_volume);
         self.set_volume(new_volume).await
     }
 

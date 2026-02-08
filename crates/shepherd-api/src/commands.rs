@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use shepherd_util::{ClientId, EntryId};
 use std::time::Duration;
 
-use crate::{ClientRole, StopMode, API_VERSION};
+use crate::{API_VERSION, ClientRole, StopMode};
 
 /// Request wrapper with metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,7 +128,6 @@ pub enum Command {
     GetHealth,
 
     // Volume control commands
-
     /// Get current volume status
     GetVolume,
 
@@ -142,7 +141,6 @@ pub enum Command {
     SetMute { muted: bool },
 
     // Admin commands
-
     /// Extend the current session (admin only)
     ExtendCurrent { by: Duration },
 

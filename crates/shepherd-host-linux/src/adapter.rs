@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use shepherd_api::EntryKind;
 use shepherd_host_api::{
-    ExitStatus, HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload,
-    HostResult, HostSessionHandle, SpawnOptions, StopMode,
+    ExitStatus, HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload, HostResult,
+    HostSessionHandle, SpawnOptions, StopMode,
 };
 use shepherd_util::SessionId;
 use std::collections::{HashMap, HashSet};
@@ -14,8 +14,8 @@ use tokio::sync::mpsc;
 use tracing::{info, warn};
 
 use crate::process::{
-    find_steam_game_pids, init, kill_by_command, kill_flatpak_cgroup, kill_snap_cgroup,
-    kill_steam_game_processes, ManagedProcess,
+    ManagedProcess, find_steam_game_pids, init, kill_by_command, kill_flatpak_cgroup,
+    kill_snap_cgroup, kill_steam_game_processes,
 };
 
 /// Expand `~` at the beginning of a path to the user's home directory
@@ -68,7 +68,7 @@ pub struct LinuxHost {
 impl LinuxHost {
     pub fn new() -> Self {
         let (tx, rx) = mpsc::unbounded_channel();
-        
+
         // Initialize process management
         init();
 
@@ -93,14 +93,8 @@ impl LinuxHost {
                 tokio::time::sleep(Duration::from_millis(100)).await;
 
                 let mut exited = Vec::new();
-                let steam_pids: HashSet<u32> = {
-                    steam_sessions
-                        .lock()
-                        .unwrap()
-                        .keys()
-                        .cloned()
-                        .collect()
-                };
+                let steam_pids: HashSet<u32> =
+                    { steam_sessions.lock().unwrap().keys().cloned().collect() };
 
                 {
                     let mut procs = processes.lock().unwrap();
@@ -140,14 +134,8 @@ impl LinuxHost {
                 }
 
                 // Track Steam sessions by Steam App ID instead of process exit
-                let steam_snapshot: Vec<SteamSession> = {
-                    steam_sessions
-                        .lock()
-                        .unwrap()
-                        .values()
-                        .cloned()
-                        .collect()
-                };
+                let steam_snapshot: Vec<SteamSession> =
+                    { steam_sessions.lock().unwrap().values().cloned().collect() };
 
                 let mut ended = Vec::new();
 
@@ -206,24 +194,35 @@ impl HostAdapter for LinuxHost {
     ) -> HostResult<HostSessionHandle> {
         // Extract argv, env, cwd, snap_name, flatpak_app_id, and steam_app_id based on entry kind
         let (argv, env, cwd, snap_name, flatpak_app_id, steam_app_id) = match entry_kind {
-            EntryKind::Process { command, args, env, cwd } => {
+            EntryKind::Process {
+                command,
+                args,
+                env,
+                cwd,
+            } => {
                 let mut argv = vec![expand_tilde(command)];
                 argv.extend(expand_args(args));
-                let expanded_cwd = cwd.as_ref().map(|c| {
-                    std::path::PathBuf::from(expand_tilde(&c.to_string_lossy()))
-                });
+                let expanded_cwd = cwd
+                    .as_ref()
+                    .map(|c| std::path::PathBuf::from(expand_tilde(&c.to_string_lossy())));
                 (argv, env.clone(), expanded_cwd, None, None, None)
             }
-            EntryKind::Snap { snap_name, command, args, env } => {
+            EntryKind::Snap {
+                snap_name,
+                command,
+                args,
+                env,
+            } => {
                 // For snap apps, we need to use 'snap run <snap_name>' to launch them.
                 // The command (if specified) is passed as an argument after the snap name,
                 // followed by any additional args.
                 let mut argv = vec!["snap".to_string(), "run".to_string(), snap_name.clone()];
                 // If a custom command is specified (different from snap_name), add it
                 if let Some(cmd) = command
-                    && cmd != snap_name {
-                        argv.push(cmd.clone());
-                    }
+                    && cmd != snap_name
+                {
+                    argv.push(cmd.clone());
+                }
                 argv.extend(expand_args(args));
                 (argv, env.clone(), None, Some(snap_name.clone()), None, None)
             }
@@ -257,13 +256,19 @@ impl HostAdapter for LinuxHost {
                 }
                 (argv, HashMap::new(), None, None, None, None)
             }
-            EntryKind::Media { library_id, args: _ } => {
+            EntryKind::Media {
+                library_id,
+                args: _,
+            } => {
                 // For media, we'd typically launch a media player
                 // This is a placeholder - real implementation would integrate with a player
                 let argv = vec!["xdg-open".to_string(), expand_tilde(library_id)];
                 (argv, HashMap::new(), None, None, None, None)
             }
-            EntryKind::Custom { type_name: _, payload: _ } => {
+            EntryKind::Custom {
+                type_name: _,
+                payload: _,
+            } => {
                 return Err(HostError::UnsupportedKind);
             }
         };
@@ -282,7 +287,7 @@ impl HostAdapter for LinuxHost {
 
         // Determine if this is a sandboxed app (snap or flatpak)
         let sandboxed_app_name = snap_name.clone().or_else(|| flatpak_app_id.clone());
-        
+
         let proc = ManagedProcess::spawn(
             &argv,
             &env,
@@ -293,7 +298,7 @@ impl HostAdapter for LinuxHost {
 
         let pid = proc.pid;
         let pgid = proc.pgid;
-        
+
         // Store the session info so we can use it for killing even after process exits
         let session_info_entry = SessionInfo {
             command_name: command_name.clone(),
@@ -301,13 +306,13 @@ impl HostAdapter for LinuxHost {
             flatpak_app_id: flatpak_app_id.clone(),
             steam_app_id,
         };
-        self.session_info.lock().unwrap().insert(session_id.clone(), session_info_entry);
+        self.session_info
+            .lock()
+            .unwrap()
+            .insert(session_id.clone(), session_info_entry);
         info!(session_id = %session_id, command = %command_name, snap = ?snap_name, flatpak = ?flatpak_app_id, "Tracking session info");
 
-        let handle = HostSessionHandle::new(
-            session_id,
-            HostHandlePayload::Linux { pid, pgid },
-        );
+        let handle = HostSessionHandle::new(session_id, HostHandlePayload::Linux { pid, pgid });
 
         self.processes.lock().unwrap().insert(pid, proc);
 
@@ -337,10 +342,10 @@ impl HostAdapter for LinuxHost {
 
         // Get the session's info for killing
         let session_info = self.session_info.lock().unwrap().get(&session_id).cloned();
-        
+
         // Check if we have session info OR a tracked process
         let has_process = self.processes.lock().unwrap().contains_key(&pid);
-        
+
         if session_info.is_none() && !has_process {
             warn!(session_id = %session_id, pid = pid, "No session info or tracked process found");
             return Err(HostError::SessionNotFound);
@@ -354,11 +359,15 @@ impl HostAdapter for LinuxHost {
                         kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGTERM);
                         info!(snap = %snap, "Sent SIGTERM via snap cgroup");
                     } else if let Some(app_id) = info.steam_app_id {
-                        let _ = kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGTERM);
+                        let _ =
+                            kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGTERM);
                         if let Ok(mut map) = self.steam_sessions.lock() {
                             map.entry(pid).and_modify(|entry| entry.seen_game = true);
                         }
-                        info!(steam_app_id = app_id, "Sent SIGTERM to Steam game processes");
+                        info!(
+                            steam_app_id = app_id,
+                            "Sent SIGTERM to Steam game processes"
+                        );
                     } else if let Some(ref app_id) = info.flatpak_app_id {
                         kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGTERM);
                         info!(flatpak = %app_id, "Sent SIGTERM via flatpak cgroup");
@@ -370,7 +379,10 @@ impl HostAdapter for LinuxHost {
                 }
 
                 // Also send SIGTERM via process handle (skip for Steam sessions)
-                let is_steam = session_info.as_ref().and_then(|info| info.steam_app_id).is_some();
+                let is_steam = session_info
+                    .as_ref()
+                    .and_then(|info| info.steam_app_id)
+                    .is_some();
                 if !is_steam {
                     let procs = self.processes.lock().unwrap();
                     if let Some(p) = procs.get(&pid) {
@@ -388,13 +400,22 @@ impl HostAdapter for LinuxHost {
                                 kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
                                 info!(snap = %snap, "Sent SIGKILL via snap cgroup (timeout)");
                             } else if let Some(app_id) = info.steam_app_id {
-                                let _ = kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGKILL);
-                                info!(steam_app_id = app_id, "Sent SIGKILL to Steam game processes (timeout)");
+                                let _ = kill_steam_game_processes(
+                                    app_id,
+                                    nix::sys::signal::Signal::SIGKILL,
+                                );
+                                info!(
+                                    steam_app_id = app_id,
+                                    "Sent SIGKILL to Steam game processes (timeout)"
+                                );
                             } else if let Some(ref app_id) = info.flatpak_app_id {
                                 kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGKILL);
                                 info!(flatpak = %app_id, "Sent SIGKILL via flatpak cgroup (timeout)");
                             } else {
-                                kill_by_command(&info.command_name, nix::sys::signal::Signal::SIGKILL);
+                                kill_by_command(
+                                    &info.command_name,
+                                    nix::sys::signal::Signal::SIGKILL,
+                                );
                                 info!(command = %info.command_name, "Sent SIGKILL via command name (timeout)");
                             }
                         }
@@ -418,7 +439,7 @@ impl HostAdapter for LinuxHost {
                     } else {
                         self.processes.lock().unwrap().contains_key(&pid)
                     };
-                    
+
                     if !still_running {
                         break;
                     }
@@ -433,11 +454,15 @@ impl HostAdapter for LinuxHost {
                         kill_snap_cgroup(snap, nix::sys::signal::Signal::SIGKILL);
                         info!(snap = %snap, "Sent SIGKILL via snap cgroup");
                     } else if let Some(app_id) = info.steam_app_id {
-                        let _ = kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGKILL);
+                        let _ =
+                            kill_steam_game_processes(app_id, nix::sys::signal::Signal::SIGKILL);
                         if let Ok(mut map) = self.steam_sessions.lock() {
                             map.entry(pid).and_modify(|entry| entry.seen_game = true);
                         }
-                        info!(steam_app_id = app_id, "Sent SIGKILL to Steam game processes");
+                        info!(
+                            steam_app_id = app_id,
+                            "Sent SIGKILL to Steam game processes"
+                        );
                     } else if let Some(ref app_id) = info.flatpak_app_id {
                         kill_flatpak_cgroup(app_id, nix::sys::signal::Signal::SIGKILL);
                         info!(flatpak = %app_id, "Sent SIGKILL via flatpak cgroup");
@@ -448,7 +473,10 @@ impl HostAdapter for LinuxHost {
                 }
 
                 // Also force kill via process handle (skip for Steam sessions)
-                let is_steam = session_info.as_ref().and_then(|info| info.steam_app_id).is_some();
+                let is_steam = session_info
+                    .as_ref()
+                    .and_then(|info| info.steam_app_id)
+                    .is_some();
                 if !is_steam {
                     let procs = self.processes.lock().unwrap();
                     if let Some(p) = procs.get(&pid) {
@@ -457,7 +485,7 @@ impl HostAdapter for LinuxHost {
                 }
             }
         }
-        
+
         // Clean up the session info tracking
         self.session_info.lock().unwrap().remove(&session_id);
 

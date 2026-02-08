@@ -6,15 +6,15 @@
 //! - Time windows, limits, and warnings
 //! - Validation with clear error messages
 
+mod internet;
 mod policy;
 mod schema;
 mod validation;
-mod internet;
 
+pub use internet::*;
 pub use policy::*;
 pub use schema::*;
 pub use validation::*;
-pub use internet::*;
 
 use std::path::Path;
 use thiserror::Error;

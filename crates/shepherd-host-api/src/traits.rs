@@ -82,9 +82,7 @@ pub enum HostEvent {
     },
 
     /// Window is ready (for UI notification)
-    WindowReady {
-        handle: HostSessionHandle,
-    },
+    WindowReady { handle: HostSessionHandle },
 
     /// Spawn failed after handle was created
     SpawnFailed {
@@ -141,6 +139,8 @@ mod tests {
     #[test]
     fn stop_mode_default() {
         let mode = StopMode::default();
-        assert!(matches!(mode, StopMode::Graceful { timeout } if timeout == Duration::from_secs(5)));
+        assert!(
+            matches!(mode, StopMode::Graceful { timeout } if timeout == Duration::from_secs(5))
+        );
     }
 }

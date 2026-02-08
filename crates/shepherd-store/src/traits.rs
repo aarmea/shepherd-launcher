@@ -30,11 +30,7 @@ pub trait Store: Send + Sync {
     fn get_cooldown_until(&self, entry_id: &EntryId) -> StoreResult<Option<DateTime<Local>>>;
 
     /// Set cooldown expiry time for an entry
-    fn set_cooldown_until(
-        &self,
-        entry_id: &EntryId,
-        until: DateTime<Local>,
-    ) -> StoreResult<()>;
+    fn set_cooldown_until(&self, entry_id: &EntryId, until: DateTime<Local>) -> StoreResult<()>;
 
     /// Clear cooldown for an entry
     fn clear_cooldown(&self, entry_id: &EntryId) -> StoreResult<()>;

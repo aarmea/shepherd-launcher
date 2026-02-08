@@ -35,16 +35,18 @@ impl BatteryStatus {
 
                 // Check for battery
                 if name_str.starts_with("BAT")
-                    && let Some((percent, charging)) = read_battery_info(&path) {
-                        status.percent = Some(percent);
-                        status.charging = charging;
-                    }
+                    && let Some((percent, charging)) = read_battery_info(&path)
+                {
+                    status.percent = Some(percent);
+                    status.charging = charging;
+                }
 
                 // Check for AC adapter
                 if (name_str.starts_with("AC") || name_str.contains("ADP"))
-                    && let Some(online) = read_ac_status(&path) {
-                        status.ac_connected = online;
-                    }
+                    && let Some(online) = read_ac_status(&path)
+                {
+                    status.ac_connected = online;
+                }
             }
         }
 

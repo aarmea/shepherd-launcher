@@ -17,6 +17,7 @@ libgdk-pixbuf-xlib-2.0-dev
 # Wayland development libraries
 libwayland-dev
 libxkbcommon-dev
+libudev-dev
 
 # X11 (for XWayland support)
 libx11-dev
