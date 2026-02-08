@@ -51,7 +51,7 @@ mod imp {
 
             // Configure flow box
             self.flow_box.set_homogeneous(true);
-            self.flow_box.set_selection_mode(gtk4::SelectionMode::None);
+            self.flow_box.set_selection_mode(gtk4::SelectionMode::Single);
             self.flow_box.set_max_children_per_line(6);
             self.flow_box.set_min_children_per_line(2);
             self.flow_box.set_row_spacing(24);
@@ -60,6 +60,7 @@ mod imp {
             self.flow_box.set_valign(gtk4::Align::Center);
             self.flow_box.set_hexpand(true);
             self.flow_box.set_vexpand(true);
+            self.flow_box.set_focusable(true);
             self.flow_box.add_css_class("launcher-grid");
 
             // Wrap in a scrolled window
@@ -125,6 +126,8 @@ impl LauncherGrid {
             imp.flow_box.insert(&tile, -1);
             imp.tiles.borrow_mut().push(tile);
         }
+
+        self.select_first();
     }
 
     /// Enable or disable all tiles
@@ -132,6 +135,82 @@ impl LauncherGrid {
         for tile in self.imp().tiles.borrow().iter() {
             tile.set_sensitive(sensitive);
         }
+    }
+
+    pub fn select_first(&self) {
+        let imp = self.imp();
+        if let Some(child) = imp.flow_box.child_at_index(0) {
+            imp.flow_box.select_child(&child);
+            child.grab_focus();
+        }
+    }
+
+    pub fn move_selection(&self, dx: i32, dy: i32) {
+        let imp = self.imp();
+        let tile_count = imp.tiles.borrow().len() as i32;
+        if tile_count == 0 {
+            return;
+        }
+
+        let current_index = imp
+            .flow_box
+            .selected_children()
+            .first()
+            .map(|child| child.index())
+            .unwrap_or(0);
+
+        let columns = self.estimated_columns(tile_count);
+        let mut new_index = current_index + dx + (dy * columns);
+        new_index = new_index.clamp(0, tile_count - 1);
+
+        if let Some(child) = imp.flow_box.child_at_index(new_index) {
+            imp.flow_box.select_child(&child);
+            child.grab_focus();
+        }
+    }
+
+    pub fn launch_selected(&self) {
+        let imp = self.imp();
+        let maybe_child = imp.flow_box.selected_children().first().cloned();
+        let Some(child) = maybe_child else {
+            return;
+        };
+
+        let index = child.index();
+        if index < 0 {
+            return;
+        }
+
+        let tile = imp.tiles.borrow().get(index as usize).cloned();
+        if let Some(tile) = tile {
+            if !tile.is_sensitive() {
+                return;
+            }
+            if let Some(entry_id) = tile.entry_id()
+                && let Some(callback) = imp.on_launch.borrow().as_ref()
+            {
+                callback(entry_id);
+            }
+        }
+    }
+
+    fn estimated_columns(&self, tile_count: i32) -> i32 {
+        let imp = self.imp();
+        let width = imp.flow_box.allocation().width();
+
+        let max_cols = imp.flow_box.max_children_per_line() as i32;
+        let min_cols = imp.flow_box.min_children_per_line() as i32;
+        let fallback = max_cols.clamp(min_cols, tile_count.max(1));
+
+        if width <= 0 {
+            return fallback.max(1);
+        }
+
+        // Tile width is 160 and column spacing is 24.
+        let estimated = width / (160 + 24);
+        estimated
+            .clamp(min_cols.max(1), max_cols.max(1))
+            .clamp(1, tile_count.max(1))
     }
 }
 
