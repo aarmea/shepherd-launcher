@@ -158,8 +158,7 @@ jobs:
       - name: Check formatting
         run: |
           . "$HOME/.cargo/env"
-          cargo fmt --all
-          git diff --exit-code
+          cargo fmt --all -- --check
 
   shellcheck:
     name: ShellCheck
