@@ -528,7 +528,25 @@ impl LauncherApp {
                     axis_state.right = false;
                 }
             }
-            gilrs::Axis::LeftStickY | gilrs::Axis::DPadY => {
+            gilrs::Axis::LeftStickY => {
+                if value <= -THRESHOLD {
+                    if !axis_state.down {
+                        grid.move_selection(0, 1);
+                    }
+                    axis_state.down = true;
+                    axis_state.up = false;
+                } else if value >= THRESHOLD {
+                    if !axis_state.up {
+                        grid.move_selection(0, -1);
+                    }
+                    axis_state.up = true;
+                    axis_state.down = false;
+                } else {
+                    axis_state.up = false;
+                    axis_state.down = false;
+                }
+            }
+            gilrs::Axis::DPadY => {
                 if value <= -THRESHOLD {
                     if !axis_state.up {
                         grid.move_selection(0, -1);
