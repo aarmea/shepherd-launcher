@@ -2,10 +2,9 @@
 
 use chrono::{DateTime, Local};
 use shepherd_api::{
-    ServiceStateSnapshot, EntryView, ReasonCode, SessionEndReason,
-    WarningSeverity, API_VERSION,
+    API_VERSION, EntryView, ReasonCode, ServiceStateSnapshot, SessionEndReason, WarningSeverity,
 };
-use shepherd_config::{Entry, Policy, InternetCheckTarget};
+use shepherd_config::{Entry, InternetCheckTarget, Policy};
 use shepherd_host_api::{HostCapabilities, HostSessionHandle};
 use shepherd_store::{AuditEvent, AuditEventType, Store};
 use shepherd_util::{EntryId, MonotonicInstant, SessionId};
@@ -44,11 +43,7 @@ pub struct CoreEngine {
 
 impl CoreEngine {
     /// Create a new core engine
-    pub fn new(
-        policy: Policy,
-        store: Arc<dyn Store>,
-        capabilities: HostCapabilities,
-    ) -> Self {
+    pub fn new(policy: Policy, store: Arc<dyn Store>, capabilities: HostCapabilities) -> Self {
         info!(
             entry_count = policy.entries.len(),
             "Core engine initialized"
@@ -79,9 +74,11 @@ impl CoreEngine {
         let entry_count = policy.entries.len();
         self.policy = policy;
 
-        let _ = self.store.append_audit(AuditEvent::new(AuditEventType::PolicyLoaded {
-            entry_count,
-        }));
+        let _ = self
+            .store
+            .append_audit(AuditEvent::new(AuditEventType::PolicyLoaded {
+                entry_count,
+            }));
 
         info!(entry_count, "Policy reloaded");
 
@@ -137,11 +134,12 @@ impl CoreEngine {
 
         // Check internet requirement
         if entry.internet.required {
-            let check = entry
+            let check = entry.internet.check.as_ref().or(self
+                .policy
+                .service
                 .internet
                 .check
-                .as_ref()
-                .or(self.policy.service.internet.check.as_ref());
+                .as_ref());
             let available = check
                 .map(|target| self.internet_available(target))
                 .unwrap_or(false);
@@ -165,19 +163,23 @@ impl CoreEngine {
 
         // Check cooldown
         if let Ok(Some(until)) = self.store.get_cooldown_until(&entry.id)
-            && until > now {
-                enabled = false;
-                reasons.push(ReasonCode::CooldownActive { available_at: until });
-            }
+            && until > now
+        {
+            enabled = false;
+            reasons.push(ReasonCode::CooldownActive {
+                available_at: until,
+            });
+        }
 
         // Check daily quota
         if let Some(quota) = entry.limits.daily_quota {
             let today = now.date_naive();
             if let Ok(used) = self.store.get_usage(&entry.id, today)
-                && used >= quota {
-                    enabled = false;
-                    reasons.push(ReasonCode::QuotaExhausted { used, quota });
-                }
+                && used >= quota
+            {
+                enabled = false;
+                reasons.push(ReasonCode::QuotaExhausted { used, quota });
+            }
         }
 
         // Calculate max run if enabled (None when disabled, Some(None) flattened for unlimited)
@@ -227,11 +229,7 @@ impl CoreEngine {
     }
 
     /// Request to launch an entry
-    pub fn request_launch(
-        &self,
-        entry_id: &EntryId,
-        now: DateTime<Local>,
-    ) -> LaunchDecision {
+    pub fn request_launch(&self, entry_id: &EntryId, now: DateTime<Local>) -> LaunchDecision {
         // Find entry
         let entry = match self.policy.get_entry(entry_id) {
             Some(e) => e,
@@ -249,10 +247,12 @@ impl CoreEngine {
 
         if !view.enabled {
             // Log denial
-            let _ = self.store.append_audit(AuditEvent::new(AuditEventType::LaunchDenied {
-                entry_id: entry_id.clone(),
-                reasons: view.reasons.iter().map(|r| format!("{:?}", r)).collect(),
-            }));
+            let _ = self
+                .store
+                .append_audit(AuditEvent::new(AuditEventType::LaunchDenied {
+                    entry_id: entry_id.clone(),
+                    reasons: view.reasons.iter().map(|r| format!("{:?}", r)).collect(),
+                }));
 
             return LaunchDecision::Denied {
                 reasons: view.reasons,
@@ -302,12 +302,14 @@ impl CoreEngine {
         };
 
         // Log to audit
-        let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionStarted {
-            session_id: session.plan.session_id.clone(),
-            entry_id: session.plan.entry_id.clone(),
-            label: session.plan.label.clone(),
-            deadline: session.deadline,
-        }));
+        let _ = self
+            .store
+            .append_audit(AuditEvent::new(AuditEventType::SessionStarted {
+                session_id: session.plan.session_id.clone(),
+                entry_id: session.plan.entry_id.clone(),
+                label: session.plan.label.clone(),
+                deadline: session.deadline,
+            }));
 
         if let Some(deadline) = session.deadline {
             info!(
@@ -384,10 +386,12 @@ impl CoreEngine {
             session.mark_warning_issued(threshold);
 
             // Log to audit
-            let _ = self.store.append_audit(AuditEvent::new(AuditEventType::WarningIssued {
-                session_id: session.plan.session_id.clone(),
-                threshold_seconds: threshold,
-            }));
+            let _ = self
+                .store
+                .append_audit(AuditEvent::new(AuditEventType::WarningIssued {
+                    session_id: session.plan.session_id.clone(),
+                    threshold_seconds: threshold,
+                }));
 
             info!(
                 session_id = %session.plan.session_id,
@@ -443,22 +447,27 @@ impl CoreEngine {
 
         // Update usage accounting
         let today = now.date_naive();
-        let _ = self.store.add_usage(&session.plan.entry_id, today, duration);
+        let _ = self
+            .store
+            .add_usage(&session.plan.entry_id, today, duration);
 
         // Set cooldown if configured
         if let Some(entry) = self.policy.get_entry(&session.plan.entry_id)
-            && let Some(cooldown) = entry.limits.cooldown {
-                let until = now + chrono::Duration::from_std(cooldown).unwrap();
-                let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
-            }
+            && let Some(cooldown) = entry.limits.cooldown
+        {
+            let until = now + chrono::Duration::from_std(cooldown).unwrap();
+            let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
+        }
 
         // Log to audit
-        let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionEnded {
-            session_id: session.plan.session_id.clone(),
-            entry_id: session.plan.entry_id.clone(),
-            reason: reason.clone(),
-            duration,
-        }));
+        let _ = self
+            .store
+            .append_audit(AuditEvent::new(AuditEventType::SessionEnded {
+                session_id: session.plan.session_id.clone(),
+                entry_id: session.plan.entry_id.clone(),
+                reason: reason.clone(),
+                duration,
+            }));
 
         info!(
             session_id = %session.plan.session_id,
@@ -492,22 +501,27 @@ impl CoreEngine {
 
         // Update usage accounting
         let today = now.date_naive();
-        let _ = self.store.add_usage(&session.plan.entry_id, today, duration);
+        let _ = self
+            .store
+            .add_usage(&session.plan.entry_id, today, duration);
 
         // Set cooldown if configured
         if let Some(entry) = self.policy.get_entry(&session.plan.entry_id)
-            && let Some(cooldown) = entry.limits.cooldown {
-                let until = now + chrono::Duration::from_std(cooldown).unwrap();
-                let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
-            }
+            && let Some(cooldown) = entry.limits.cooldown
+        {
+            let until = now + chrono::Duration::from_std(cooldown).unwrap();
+            let _ = self.store.set_cooldown_until(&session.plan.entry_id, until);
+        }
 
         // Log to audit
-        let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionEnded {
-            session_id: session.plan.session_id.clone(),
-            entry_id: session.plan.entry_id.clone(),
-            reason: reason.clone(),
-            duration,
-        }));
+        let _ = self
+            .store
+            .append_audit(AuditEvent::new(AuditEventType::SessionEnded {
+                session_id: session.plan.session_id.clone(),
+                entry_id: session.plan.entry_id.clone(),
+                reason: reason.clone(),
+                duration,
+            }));
 
         info!(
             session_id = %session.plan.session_id,
@@ -525,9 +539,10 @@ impl CoreEngine {
 
     /// Get current service state snapshot
     pub fn get_state(&self) -> ServiceStateSnapshot {
-        let current_session = self.current_session.as_ref().map(|s| {
-            s.to_session_info(MonotonicInstant::now())
-        });
+        let current_session = self
+            .current_session
+            .as_ref()
+            .map(|s| s.to_session_info(MonotonicInstant::now()));
 
         // Build entry views for the snapshot
         let entries = self.list_entries(shepherd_util::now());
@@ -577,11 +592,13 @@ impl CoreEngine {
         session.deadline = Some(new_deadline);
 
         // Log to audit
-        let _ = self.store.append_audit(AuditEvent::new(AuditEventType::SessionExtended {
-            session_id: session.plan.session_id.clone(),
-            extended_by: by,
-            new_deadline,
-        }));
+        let _ = self
+            .store
+            .append_audit(AuditEvent::new(AuditEventType::SessionExtended {
+                session_id: session.plan.session_id.clone(),
+                extended_by: by,
+                new_deadline,
+            }));
 
         info!(
             session_id = %session.plan.session_id,
@@ -597,8 +614,8 @@ impl CoreEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy};
     use shepherd_api::EntryKind;
+    use shepherd_config::{AvailabilityPolicy, Entry, LimitsPolicy};
     use shepherd_store::SqliteStore;
     use std::collections::HashMap;
 
@@ -736,19 +753,34 @@ mod tests {
         // No warnings initially (first tick may emit AvailabilitySetChanged)
         let events = engine.tick(now_mono, now);
         // Filter to just warning events for this test
-        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        let warning_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, CoreEvent::Warning { .. }))
+            .collect();
         assert!(warning_events.is_empty());
 
         // At 70 seconds (10 seconds past warning threshold), warning should fire
         let later = now_mono + Duration::from_secs(70);
         let events = engine.tick(later, now);
-        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        let warning_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, CoreEvent::Warning { .. }))
+            .collect();
         assert_eq!(warning_events.len(), 1);
-        assert!(matches!(warning_events[0], CoreEvent::Warning { threshold_seconds: 60, .. }));
+        assert!(matches!(
+            warning_events[0],
+            CoreEvent::Warning {
+                threshold_seconds: 60,
+                ..
+            }
+        ));
 
         // Warning shouldn't fire twice
         let events = engine.tick(later, now);
-        let warning_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::Warning { .. })).collect();
+        let warning_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, CoreEvent::Warning { .. }))
+            .collect();
         assert!(warning_events.is_empty());
     }
 
@@ -803,7 +835,10 @@ mod tests {
         let later = now_mono + Duration::from_secs(61);
         let events = engine.tick(later, now);
         // Filter to just expiry events for this test
-        let expiry_events: Vec<_> = events.iter().filter(|e| matches!(e, CoreEvent::ExpireDue { .. })).collect();
+        let expiry_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, CoreEvent::ExpireDue { .. }))
+            .collect();
         assert_eq!(expiry_events.len(), 1);
         assert!(matches!(expiry_events[0], CoreEvent::ExpireDue { .. }));
     }

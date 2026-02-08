@@ -30,9 +30,7 @@ pub enum CoreEvent {
     },
 
     /// Session is expiring (termination initiated)
-    ExpireDue {
-        session_id: SessionId,
-    },
+    ExpireDue { session_id: SessionId },
 
     /// Session has ended
     SessionEnded {
@@ -43,13 +41,8 @@ pub enum CoreEvent {
     },
 
     /// Entry availability changed
-    EntryAvailabilityChanged {
-        entry_id: EntryId,
-        enabled: bool,
-    },
+    EntryAvailabilityChanged { entry_id: EntryId, enabled: bool },
 
     /// Policy was reloaded
-    PolicyReloaded {
-        entry_count: usize,
-    },
+    PolicyReloaded { entry_count: usize },
 }

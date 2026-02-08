@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use shepherd_util::{EntryId, SessionId};
 use std::time::Duration;
 
-use crate::{ServiceStateSnapshot, SessionEndReason, WarningSeverity, API_VERSION};
+use crate::{API_VERSION, ServiceStateSnapshot, SessionEndReason, WarningSeverity};
 
 /// Event envelope
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,9 +51,7 @@ pub enum EventPayload {
     },
 
     /// Session is expiring (termination initiated)
-    SessionExpiring {
-        session_id: SessionId,
-    },
+    SessionExpiring { session_id: SessionId },
 
     /// Session has ended
     SessionEnded {
@@ -64,21 +62,13 @@ pub enum EventPayload {
     },
 
     /// Policy was reloaded
-    PolicyReloaded {
-        entry_count: usize,
-    },
+    PolicyReloaded { entry_count: usize },
 
     /// Entry availability changed (for UI updates)
-    EntryAvailabilityChanged {
-        entry_id: EntryId,
-        enabled: bool,
-    },
+    EntryAvailabilityChanged { entry_id: EntryId, enabled: bool },
 
     /// Volume status changed
-    VolumeChanged {
-        percent: u8,
-        muted: bool,
-    },
+    VolumeChanged { percent: u8, muted: bool },
 
     /// Service is shutting down
     Shutdown,
@@ -107,7 +97,10 @@ mod tests {
         let parsed: Event = serde_json::from_str(&json).unwrap();
 
         assert_eq!(parsed.api_version, API_VERSION);
-        assert!(matches!(parsed.payload, EventPayload::SessionStarted { .. }));
+        assert!(matches!(
+            parsed.payload,
+            EventPayload::SessionStarted { .. }
+        ));
     }
 
     #[test]

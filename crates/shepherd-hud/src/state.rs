@@ -218,17 +218,18 @@ impl SharedState {
                         entry_name,
                         ..
                     } = state
-                        && sid == session_id {
-                            *state = SessionState::Warning {
-                                session_id: session_id.clone(),
-                                entry_id: entry_id.clone(),
-                                entry_name: entry_name.clone(),
-                                warning_issued_at: std::time::Instant::now(),
-                                time_remaining_at_warning: time_remaining.as_secs(),
-                                message: message.clone(),
-                                severity: *severity,
-                            };
-                        }
+                        && sid == session_id
+                    {
+                        *state = SessionState::Warning {
+                            session_id: session_id.clone(),
+                            entry_id: entry_id.clone(),
+                            entry_name: entry_name.clone(),
+                            warning_issued_at: std::time::Instant::now(),
+                            time_remaining_at_warning: time_remaining.as_secs(),
+                            message: message.clone(),
+                            severity: *severity,
+                        };
+                    }
                 });
             }
 

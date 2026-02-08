@@ -89,7 +89,7 @@ impl LauncherTile {
         // Set icon, first trying to load as an image file, then as an icon name
         if let Some(ref icon_ref) = entry.icon_ref {
             let mut loaded = false;
-            
+
             // First, try to load as an image file (JPG, PNG, etc.)
             // Expand ~ to home directory if present
             let expanded_path = if icon_ref.starts_with("~/") {
@@ -101,14 +101,14 @@ impl LauncherTile {
             } else {
                 icon_ref.clone()
             };
-            
+
             let path = std::path::Path::new(&expanded_path);
             if path.exists() && path.is_file() {
                 // Try to load as an image file
                 imp.icon.set_from_file(Some(path));
                 loaded = true;
             }
-            
+
             // If not loaded as a file, try as an icon name from the theme
             if !loaded {
                 let icon_theme = gtk4::IconTheme::for_display(&self.display());
@@ -143,7 +143,11 @@ impl LauncherTile {
     }
 
     pub fn entry_id(&self) -> Option<shepherd_util::EntryId> {
-        self.imp().entry.borrow().as_ref().map(|e| e.entry_id.clone())
+        self.imp()
+            .entry
+            .borrow()
+            .as_ref()
+            .map(|e| e.entry_id.clone())
     }
 }
 

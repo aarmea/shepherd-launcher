@@ -10,8 +10,8 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use crate::{
-    ExitStatus, HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload,
-    HostResult, HostSessionHandle, SpawnOptions, StopMode,
+    ExitStatus, HostAdapter, HostCapabilities, HostError, HostEvent, HostHandlePayload, HostResult,
+    HostSessionHandle, SpawnOptions, StopMode,
 };
 
 /// Mock session state for testing
@@ -79,7 +79,9 @@ impl MockHost {
         if let Some(session) = sessions.values().find(|s| &s.session_id == session_id) {
             let handle = HostSessionHandle::new(
                 session.session_id.clone(),
-                HostHandlePayload::Mock { id: session.mock_id },
+                HostHandlePayload::Mock {
+                    id: session.mock_id,
+                },
             );
             let _ = self.event_tx.send(HostEvent::Exited { handle, status });
         }
@@ -122,12 +124,13 @@ impl HostAdapter for MockHost {
             exit_delay: *self.auto_exit_delay.lock().unwrap(),
         };
 
-        self.sessions.lock().unwrap().insert(mock_id, session.clone());
+        self.sessions
+            .lock()
+            .unwrap()
+            .insert(mock_id, session.clone());
 
-        let handle = HostSessionHandle::new(
-            session_id.clone(),
-            HostHandlePayload::Mock { id: mock_id },
-        );
+        let handle =
+            HostSessionHandle::new(session_id.clone(), HostHandlePayload::Mock { id: mock_id });
 
         // If auto-exit is configured, spawn a task to send exit event
         if let Some(delay) = session.exit_delay {

@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{UnixListener, UnixStream};
-use tokio::sync::{broadcast, mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock, broadcast, mpsc};
 use tracing::{debug, error, info, warn};
 
 use crate::{IpcError, IpcResult};
@@ -75,10 +75,9 @@ impl IpcServer {
         let listener = UnixListener::bind(&self.socket_path)?;
 
         // Set socket permissions (readable/writable by owner and group)
-        if let Err(err) = std::fs::set_permissions(
-            &self.socket_path,
-            std::fs::Permissions::from_mode(0o660),
-        ) {
+        if let Err(err) =
+            std::fs::set_permissions(&self.socket_path, std::fs::Permissions::from_mode(0o660))
+        {
             if err.kind() == std::io::ErrorKind::PermissionDenied {
                 warn!(
                     path = %self.socket_path.display(),
@@ -190,7 +189,8 @@ impl IpcServer {
                         match serde_json::from_str::<Request>(line) {
                             Ok(request) => {
                                 // Check for subscribe command
-                                if matches!(request.command, shepherd_api::Command::SubscribeEvents) {
+                                if matches!(request.command, shepherd_api::Command::SubscribeEvents)
+                                {
                                     let mut clients = clients.write().await;
                                     if let Some(handle) = clients.get_mut(&client_id_clone) {
                                         handle.subscribed = true;
@@ -342,13 +342,14 @@ mod tests {
         let mut server = IpcServer::new(&socket_path);
         if let Err(err) = server.start().await {
             if let IpcError::Io(ref io_err) = err
-                && io_err.kind() == std::io::ErrorKind::PermissionDenied {
-                    eprintln!(
-                        "Skipping IPC server start test due to permission error: {}",
-                        io_err
-                    );
-                    return;
-                }
+                && io_err.kind() == std::io::ErrorKind::PermissionDenied
+            {
+                eprintln!(
+                    "Skipping IPC server start test due to permission error: {}",
+                    io_err
+                );
+                return;
+            }
             panic!("IPC server start failed: {err}");
         }
 

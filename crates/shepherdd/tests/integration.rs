@@ -15,44 +15,42 @@ use std::time::Duration;
 fn make_test_policy() -> Policy {
     Policy {
         service: Default::default(),
-        entries: vec![
-            Entry {
-                id: EntryId::new("test-game"),
-                label: "Test Game".into(),
-                icon_ref: None,
-                kind: EntryKind::Process {
-                    command: "sleep".into(),
-                    args: vec!["999".into()],
-                    env: HashMap::new(),
-                    cwd: None,
-                },
-                availability: AvailabilityPolicy {
-                    windows: vec![],
-                    always: true,
-                },
-                limits: LimitsPolicy {
-                    max_run: Some(Duration::from_secs(10)), // Short for testing
-                    daily_quota: None,
-                    cooldown: None,
-                },
-                warnings: vec![
-                    WarningThreshold {
-                        seconds_before: 5,
-                        severity: WarningSeverity::Warn,
-                        message_template: Some("5 seconds left".into()),
-                    },
-                    WarningThreshold {
-                        seconds_before: 2,
-                        severity: WarningSeverity::Critical,
-                        message_template: Some("2 seconds left!".into()),
-                    },
-                ],
-                volume: None,
-                disabled: false,
-                disabled_reason: None,
-                internet: Default::default(),
+        entries: vec![Entry {
+            id: EntryId::new("test-game"),
+            label: "Test Game".into(),
+            icon_ref: None,
+            kind: EntryKind::Process {
+                command: "sleep".into(),
+                args: vec!["999".into()],
+                env: HashMap::new(),
+                cwd: None,
             },
-        ],
+            availability: AvailabilityPolicy {
+                windows: vec![],
+                always: true,
+            },
+            limits: LimitsPolicy {
+                max_run: Some(Duration::from_secs(10)), // Short for testing
+                daily_quota: None,
+                cooldown: None,
+            },
+            warnings: vec![
+                WarningThreshold {
+                    seconds_before: 5,
+                    severity: WarningSeverity::Warn,
+                    message_template: Some("5 seconds left".into()),
+                },
+                WarningThreshold {
+                    seconds_before: 2,
+                    severity: WarningSeverity::Critical,
+                    message_template: Some("2 seconds left!".into()),
+                },
+            ],
+            volume: None,
+            disabled: false,
+            disabled_reason: None,
+            internet: Default::default(),
+        }],
         default_warnings: vec![],
         default_max_run: Some(Duration::from_secs(3600)),
         volume: Default::default(),
@@ -91,7 +89,9 @@ fn test_launch_approval() {
     let entry_id = EntryId::new("test-game");
     let decision = engine.request_launch(&entry_id, shepherd_util::now());
 
-    assert!(matches!(decision, LaunchDecision::Approved(plan) if plan.max_duration == Some(Duration::from_secs(10))));
+    assert!(
+        matches!(decision, LaunchDecision::Approved(plan) if plan.max_duration == Some(Duration::from_secs(10)))
+    );
 }
 
 #[test]
@@ -150,14 +150,26 @@ fn test_warning_emission() {
     let at_6s = now + chrono::Duration::seconds(6);
     let events = engine.tick(at_6s_mono, at_6s);
     assert_eq!(events.len(), 1);
-    assert!(matches!(&events[0], CoreEvent::Warning { threshold_seconds: 5, .. }));
+    assert!(matches!(
+        &events[0],
+        CoreEvent::Warning {
+            threshold_seconds: 5,
+            ..
+        }
+    ));
 
     // At 9 seconds (1 second remaining), 2-second warning should fire
     let at_9s_mono = now_mono + Duration::from_secs(9);
     let at_9s = now + chrono::Duration::seconds(9);
     let events = engine.tick(at_9s_mono, at_9s);
     assert_eq!(events.len(), 1);
-    assert!(matches!(&events[0], CoreEvent::Warning { threshold_seconds: 2, .. }));
+    assert!(matches!(
+        &events[0],
+        CoreEvent::Warning {
+            threshold_seconds: 2,
+            ..
+        }
+    ));
 
     // Warnings shouldn't repeat
     let events = engine.tick(at_9s_mono, at_9s);
@@ -188,7 +200,9 @@ fn test_session_expiry() {
     let events = engine.tick(at_11s_mono, at_11s);
 
     // Should have both remaining warnings + expiry
-    let has_expiry = events.iter().any(|e| matches!(e, CoreEvent::ExpireDue { .. }));
+    let has_expiry = events
+        .iter()
+        .any(|e| matches!(e, CoreEvent::ExpireDue { .. }));
     assert!(has_expiry, "Expected ExpireDue event");
 }
 
@@ -291,9 +305,18 @@ fn test_config_parsing() {
     let policy = parse_config(config).unwrap();
     assert_eq!(policy.entries.len(), 1);
     assert_eq!(policy.entries[0].id.as_str(), "scummvm");
-    assert_eq!(policy.entries[0].limits.max_run, Some(Duration::from_secs(3600)));
-    assert_eq!(policy.entries[0].limits.daily_quota, Some(Duration::from_secs(7200)));
-    assert_eq!(policy.entries[0].limits.cooldown, Some(Duration::from_secs(300)));
+    assert_eq!(
+        policy.entries[0].limits.max_run,
+        Some(Duration::from_secs(3600))
+    );
+    assert_eq!(
+        policy.entries[0].limits.daily_quota,
+        Some(Duration::from_secs(7200))
+    );
+    assert_eq!(
+        policy.entries[0].limits.cooldown,
+        Some(Duration::from_secs(300))
+    );
     assert_eq!(policy.entries[0].warnings.len(), 1);
 }
 
@@ -316,7 +339,11 @@ fn test_session_extension() {
     engine.start_session(plan, now, now_mono);
 
     // Get original deadline (should be Some for this test)
-    let original_deadline = engine.current_session().unwrap().deadline.expect("Expected deadline");
+    let original_deadline = engine
+        .current_session()
+        .unwrap()
+        .deadline
+        .expect("Expected deadline");
 
     // Extend by 5 minutes
     let new_deadline = engine.extend_current(Duration::from_secs(300), now_mono, now);

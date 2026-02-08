@@ -12,20 +12,20 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use shepherd_api::{
-    Command, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus,
-    Response, ResponsePayload, SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
+    Command, ErrorCode, ErrorInfo, Event, EventPayload, HealthStatus, Response, ResponsePayload,
+    SessionEndReason, StopMode, VolumeInfo, VolumeRestrictions,
 };
-use shepherd_config::{load_config, VolumePolicy};
+use shepherd_config::{VolumePolicy, load_config};
 use shepherd_core::{CoreEngine, CoreEvent, LaunchDecision, StopDecision};
 use shepherd_host_api::{HostAdapter, HostEvent, StopMode as HostStopMode, VolumeController};
 use shepherd_host_linux::{LinuxHost, LinuxVolumeController};
 use shepherd_ipc::{IpcServer, ServerMessage};
 use shepherd_store::{AuditEvent, AuditEventType, SqliteStore, Store};
-use shepherd_util::{default_config_path, ClientId, MonotonicInstant, RateLimiter};
+use shepherd_util::{ClientId, MonotonicInstant, RateLimiter, default_config_path};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::signal::unix::{signal, SignalKind};
+use tokio::signal::unix::{SignalKind, signal};
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 use tracing_subscriber::EnvFilter;
@@ -180,12 +180,11 @@ impl Service {
         });
 
         // Set up signal handlers
-        let mut sigterm = signal(SignalKind::terminate())
-            .context("Failed to create SIGTERM handler")?;
-        let mut sigint = signal(SignalKind::interrupt())
-            .context("Failed to create SIGINT handler")?;
-        let mut sighup = signal(SignalKind::hangup())
-            .context("Failed to create SIGHUP handler")?;
+        let mut sigterm =
+            signal(SignalKind::terminate()).context("Failed to create SIGTERM handler")?;
+        let mut sigint =
+            signal(SignalKind::interrupt()).context("Failed to create SIGINT handler")?;
+        let mut sighup = signal(SignalKind::hangup()).context("Failed to create SIGHUP handler")?;
 
         // Main event loop
         let tick_interval = Duration::from_millis(100);
@@ -246,9 +245,16 @@ impl Service {
             let engine = engine.lock().await;
             if let Some(session) = engine.current_session() {
                 info!(session_id = %session.plan.session_id, "Stopping active session");
-                if let Some(handle) = &session.host_handle && let Err(e) = host.stop(handle, HostStopMode::Graceful {
-                    timeout: Duration::from_secs(5),
-                }).await {
+                if let Some(handle) = &session.host_handle
+                    && let Err(e) = host
+                        .stop(
+                            handle,
+                            HostStopMode::Graceful {
+                                timeout: Duration::from_secs(5),
+                            },
+                        )
+                        .await
+                {
                     warn!(error = %e, "Failed to stop session gracefully");
                 }
             }
@@ -301,9 +307,7 @@ impl Service {
                 // Get the host handle and stop it
                 let handle = {
                     let engine = engine.lock().await;
-                    engine
-                        .current_session()
-                        .and_then(|s| s.host_handle.clone())
+                    engine.current_session().and_then(|s| s.host_handle.clone())
                 };
 
                 if let Some(handle) = handle
@@ -315,10 +319,10 @@ impl Service {
                             },
                         )
                         .await
-                    {
-                        warn!(error = %e, "Failed to stop session gracefully, forcing");
-                        let _ = host.stop(&handle, HostStopMode::Force).await;
-                    }
+                {
+                    warn!(error = %e, "Failed to stop session gracefully, forcing");
+                    let _ = host.stop(&handle, HostStopMode::Force).await;
+                }
 
                 ipc.broadcast_event(Event::new(EventPayload::SessionExpiring {
                     session_id: session_id.clone(),
@@ -405,7 +409,10 @@ impl Service {
                     engine.notify_session_exited(status.code, now_mono, now)
                 };
 
-                info!(has_event = core_event.is_some(), "notify_session_exited result");
+                info!(
+                    has_event = core_event.is_some(),
+                    "notify_session_exited result"
+                );
 
                 if let Some(CoreEvent::SessionEnded {
                     session_id,
@@ -413,29 +420,29 @@ impl Service {
                     reason,
                     duration,
                 }) = core_event
-                    {
-                        info!(
-                            session_id = %session_id,
-                            entry_id = %entry_id,
-                            reason = ?reason,
-                            duration_secs = duration.as_secs(),
-                            "Broadcasting SessionEnded"
-                        );
-                        ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
-                            session_id,
-                            entry_id,
-                            reason,
-                            duration,
-                        }));
+                {
+                    info!(
+                        session_id = %session_id,
+                        entry_id = %entry_id,
+                        reason = ?reason,
+                        duration_secs = duration.as_secs(),
+                        "Broadcasting SessionEnded"
+                    );
+                    ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
+                        session_id,
+                        entry_id,
+                        reason,
+                        duration,
+                    }));
 
-                        // Broadcast state change
-                        let state = {
-                            let engine = engine.lock().await;
-                            engine.get_state()
-                        };
-                        info!("Broadcasting StateChanged");
-                        ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
-                    }
+                    // Broadcast state change
+                    let state = {
+                        let engine = engine.lock().await;
+                        engine.get_state()
+                    };
+                    info!("Broadcasting StateChanged");
+                    ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
+                }
             }
 
             HostEvent::WindowReady { handle } => {
@@ -472,9 +479,17 @@ impl Service {
                     }
                 }
 
-                let response =
-                    Self::handle_command(engine, host, volume, ipc, store, &client_id, request.request_id, request.command)
-                        .await;
+                let response = Self::handle_command(
+                    engine,
+                    host,
+                    volume,
+                    ipc,
+                    store,
+                    &client_id,
+                    request.request_id,
+                    request.command,
+                )
+                .await;
 
                 let _ = ipc.send_response(&client_id, response).await;
             }
@@ -487,23 +502,19 @@ impl Service {
                     "Client connected"
                 );
 
-                let _ = store.append_audit(AuditEvent::new(
-                    AuditEventType::ClientConnected {
-                        client_id: client_id.to_string(),
-                        role: format!("{:?}", info.role),
-                        uid: info.uid,
-                    },
-                ));
+                let _ = store.append_audit(AuditEvent::new(AuditEventType::ClientConnected {
+                    client_id: client_id.to_string(),
+                    role: format!("{:?}", info.role),
+                    uid: info.uid,
+                }));
             }
 
             ServerMessage::ClientDisconnected { client_id } => {
                 debug!(client_id = %client_id, "Client disconnected");
 
-                let _ = store.append_audit(AuditEvent::new(
-                    AuditEventType::ClientDisconnected {
-                        client_id: client_id.to_string(),
-                    },
-                ));
+                let _ = store.append_audit(AuditEvent::new(AuditEventType::ClientDisconnected {
+                    client_id: client_id.to_string(),
+                }));
 
                 // Clean up rate limiter
                 let mut limiter = rate_limiter.lock().await;
@@ -547,10 +558,7 @@ impl Service {
                         let event = eng.start_session(plan.clone(), now, now_mono);
 
                         // Get the entry kind for spawning
-                        let entry_kind = eng
-                            .policy()
-                            .get_entry(&entry_id)
-                            .map(|e| e.kind.clone());
+                        let entry_kind = eng.policy().get_entry(&entry_id).map(|e| e.kind.clone());
 
                         // Build spawn options with log path if capture_child_output is enabled
                         let spawn_options = if eng.policy().service.capture_child_output {
@@ -577,11 +585,7 @@ impl Service {
 
                         if let Some(kind) = entry_kind {
                             match host
-                                .spawn(
-                                    plan.session_id.clone(),
-                                    &kind,
-                                    spawn_options,
-                                )
+                                .spawn(plan.session_id.clone(), &kind, spawn_options)
                                 .await
                             {
                                 Ok(handle) => {
@@ -597,12 +601,14 @@ impl Service {
                                         deadline,
                                     } = event
                                     {
-                                        ipc.broadcast_event(Event::new(EventPayload::SessionStarted {
-                                            session_id: session_id.clone(),
-                                            entry_id,
-                                            label,
-                                            deadline,
-                                        }));
+                                        ipc.broadcast_event(Event::new(
+                                            EventPayload::SessionStarted {
+                                                session_id: session_id.clone(),
+                                                entry_id,
+                                                label,
+                                                deadline,
+                                            },
+                                        ));
 
                                         Response::success(
                                             request_id,
@@ -614,7 +620,10 @@ impl Service {
                                     } else {
                                         Response::error(
                                             request_id,
-                                            ErrorInfo::new(ErrorCode::InternalError, "Unexpected event"),
+                                            ErrorInfo::new(
+                                                ErrorCode::InternalError,
+                                                "Unexpected event",
+                                            ),
                                         )
                                     }
                                 }
@@ -627,18 +636,22 @@ impl Service {
                                         reason,
                                         duration,
                                     }) = eng.notify_session_exited(Some(-1), now_mono, now)
-                                        {
-                                            ipc.broadcast_event(Event::new(EventPayload::SessionEnded {
+                                    {
+                                        ipc.broadcast_event(Event::new(
+                                            EventPayload::SessionEnded {
                                                 session_id,
                                                 entry_id,
                                                 reason,
                                                 duration,
-                                            }));
+                                            },
+                                        ));
 
-                                            // Broadcast state change so clients return to idle
-                                            let state = eng.get_state();
-                                            ipc.broadcast_event(Event::new(EventPayload::StateChanged(state)));
-                                        }
+                                        // Broadcast state change so clients return to idle
+                                        let state = eng.get_state();
+                                        ipc.broadcast_event(Event::new(
+                                            EventPayload::StateChanged(state),
+                                        ));
+                                    }
 
                                     Response::error(
                                         request_id,
@@ -666,9 +679,7 @@ impl Service {
                 let mut eng = engine.lock().await;
 
                 // Get handle before stopping in engine
-                let handle = eng
-                    .current_session()
-                    .and_then(|s| s.host_handle.clone());
+                let handle = eng.current_session().and_then(|s| s.host_handle.clone());
 
                 let reason = match mode {
                     StopMode::Graceful => SessionEndReason::UserStop,
@@ -719,12 +730,13 @@ impl Service {
             Command::ReloadConfig => {
                 // Check permission
                 if let Some(info) = ipc.get_client_info(client_id).await
-                    && !info.role.can_reload_config() {
-                        return Response::error(
-                            request_id,
-                            ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
-                        );
-                    }
+                    && !info.role.can_reload_config()
+                {
+                    return Response::error(
+                        request_id,
+                        ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
+                    );
+                }
 
                 // TODO: Reload from original config path
                 Response::error(
@@ -733,14 +745,12 @@ impl Service {
                 )
             }
 
-            Command::SubscribeEvents => {
-                Response::success(
-                    request_id,
-                    ResponsePayload::Subscribed {
-                        client_id: client_id.clone(),
-                    },
-                )
-            }
+            Command::SubscribeEvents => Response::success(
+                request_id,
+                ResponsePayload::Subscribed {
+                    client_id: client_id.clone(),
+                },
+            ),
 
             Command::UnsubscribeEvents => {
                 Response::success(request_id, ResponsePayload::Unsubscribed)
@@ -761,21 +771,28 @@ impl Service {
             Command::ExtendCurrent { by } => {
                 // Check permission
                 if let Some(info) = ipc.get_client_info(client_id).await
-                    && !info.role.can_extend() {
-                        return Response::error(
-                            request_id,
-                            ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
-                        );
-                    }
+                    && !info.role.can_extend()
+                {
+                    return Response::error(
+                        request_id,
+                        ErrorInfo::new(ErrorCode::PermissionDenied, "Admin role required"),
+                    );
+                }
 
                 let mut eng = engine.lock().await;
                 match eng.extend_current(by, now_mono, now) {
-                    Some(new_deadline) => {
-                        Response::success(request_id, ResponsePayload::Extended { new_deadline: Some(new_deadline) })
-                    }
+                    Some(new_deadline) => Response::success(
+                        request_id,
+                        ResponsePayload::Extended {
+                            new_deadline: Some(new_deadline),
+                        },
+                    ),
                     None => Response::error(
                         request_id,
-                        ErrorInfo::new(ErrorCode::NoActiveSession, "No active session or session is unlimited"),
+                        ErrorInfo::new(
+                            ErrorCode::NoActiveSession,
+                            "No active session or session is unlimited",
+                        ),
                     ),
                 }
             }
@@ -913,14 +930,15 @@ impl Service {
         engine: &Arc<Mutex<CoreEngine>>,
     ) -> VolumeRestrictions {
         let eng = engine.lock().await;
-        
+
         // Check if there's an active session with volume restrictions
         if let Some(session) = eng.current_session()
             && let Some(entry) = eng.policy().get_entry(&session.plan.entry_id)
-            && let Some(ref vol_policy) = entry.volume {
-                return Self::convert_volume_policy(vol_policy);
-            }
-        
+            && let Some(ref vol_policy) = entry.volume
+        {
+            return Self::convert_volume_policy(vol_policy);
+        }
+
         // Fall back to global policy
         Self::convert_volume_policy(&eng.policy().volume)
     }
@@ -940,18 +958,15 @@ async fn main() -> Result<()> {
     let args = Args::parse();
 
     // Initialize logging
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(&args.log_level));
+    let filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&args.log_level));
 
     tracing_subscriber::fmt()
         .with_env_filter(filter)
         .with_target(true)
         .init();
 
-    info!(
-        version = env!("CARGO_PKG_VERSION"),
-        "shepherdd starting"
-    );
+    info!(version = env!("CARGO_PKG_VERSION"), "shepherdd starting");
 
     // Create and run the service
     let service = Service::new(&args).await?;

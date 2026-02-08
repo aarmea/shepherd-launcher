@@ -240,17 +240,17 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
     // Handle slider value changes with debouncing
     // Create a channel for volume requests - the worker will debounce them
     let (volume_tx, volume_rx) = mpsc::channel::<u8>();
-    
+
     // Spawn a dedicated volume worker thread that debounces requests
     std::thread::spawn(move || {
         const DEBOUNCE_MS: u64 = 50; // Wait 50ms for more changes before sending
-        
+
         loop {
             // Wait for first volume request
             let Ok(mut latest_percent) = volume_rx.recv() else {
                 break; // Channel closed
             };
-            
+
             // Drain any pending requests, keeping only the latest value
             // Use a short timeout to debounce rapid changes
             loop {
@@ -267,24 +267,24 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                     }
                 }
             }
-            
+
             // Send only the final value
             if let Err(e) = crate::volume::set_volume(latest_percent) {
                 tracing::error!("Failed to set volume: {}", e);
             }
         }
     });
-    
+
     let slider_changing = std::rc::Rc::new(std::cell::Cell::new(false));
     let slider_changing_clone = slider_changing.clone();
-    
+
     volume_slider.connect_change_value(move |slider, _, value| {
         slider_changing_clone.set(true);
         let percent = value.clamp(0.0, 100.0) as u8;
-        
+
         // Send to debounce worker (non-blocking)
         let _ = volume_tx.send(percent);
-        
+
         // Allow the slider to update immediately in UI
         slider.set_value(value);
         glib::Propagation::Stop
@@ -414,11 +414,11 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                 let remaining = time_remaining_at_warning.saturating_sub(elapsed);
                 time_display_clone.set_remaining(Some(remaining));
                 // Use configuration-defined message if present, otherwise show time-based message
-                let warning_text = message.clone().unwrap_or_else(|| {
-                    format!("Only {} seconds remaining!", remaining)
-                });
+                let warning_text = message
+                    .clone()
+                    .unwrap_or_else(|| format!("Only {} seconds remaining!", remaining));
                 warning_label_clone.set_text(&warning_text);
-                
+
                 // Apply severity-based CSS classes
                 warning_box_clone.remove_css_class("warning-info");
                 warning_box_clone.remove_css_class("warning-warn");
@@ -434,7 +434,7 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
                         warning_box_clone.add_css_class("warning-critical");
                     }
                 }
-                
+
                 warning_box_clone.set_visible(true);
             }
             SessionState::Ending { reason, .. } => {
@@ -457,19 +457,19 @@ fn build_hud_content(state: SharedState) -> gtk4::Box {
         if let Some(volume) = state.volume_info() {
             volume_button_clone.set_icon_name(volume.icon_name());
             volume_label_clone.set_text(&format!("{}%", volume.percent));
-            
+
             // Only update slider if user is not actively dragging it
             if !slider_changing_for_update.get() {
                 volume_slider_clone.set_value(volume.percent as f64);
             }
             // Reset the changing flag after a short delay
             slider_changing_for_update.set(false);
-            
+
             // Disable slider when muted or when restrictions don't allow changes
             let slider_enabled = !volume.muted && volume.restrictions.allow_change;
             volume_slider_clone.set_sensitive(slider_enabled);
             volume_button_clone.set_sensitive(volume.restrictions.allow_mute);
-            
+
             // Update slider range based on restrictions
             let min = volume.restrictions.min_volume.unwrap_or(0) as f64;
             let max = volume.restrictions.max_volume.unwrap_or(100) as f64;

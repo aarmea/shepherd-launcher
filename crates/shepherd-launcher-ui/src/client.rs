@@ -57,7 +57,7 @@ impl ServiceClient {
                 Err(e) => {
                     error!(error = %e, "Connection error");
                     self.state.set(LauncherState::Disconnected);
-                    
+
                     // Wait before reconnecting
                     sleep(Duration::from_secs(2)).await;
                 }
@@ -69,7 +69,7 @@ impl ServiceClient {
         self.state.set(LauncherState::Connecting);
 
         info!(path = %self.socket_path.display(), "Connecting to shepherdd");
-        
+
         let mut client = IpcClient::connect(&self.socket_path)
             .await
             .context("Failed to connect to shepherdd")?;
@@ -162,11 +162,17 @@ impl ServiceClient {
                     }
                     ResponsePayload::Entries(entries) => {
                         // Only update if we're in idle state
-                        if matches!(self.state.get(), LauncherState::Idle { .. } | LauncherState::Connecting) {
+                        if matches!(
+                            self.state.get(),
+                            LauncherState::Idle { .. } | LauncherState::Connecting
+                        ) {
                             self.state.set(LauncherState::Idle { entries });
                         }
                     }
-                    ResponsePayload::LaunchApproved { session_id, deadline } => {
+                    ResponsePayload::LaunchApproved {
+                        session_id,
+                        deadline,
+                    } => {
                         let now = shepherd_util::now();
                         // For unlimited sessions (deadline=None), time_remaining is None
                         let time_remaining = deadline.and_then(|d| {
@@ -195,9 +201,7 @@ impl ServiceClient {
                 Ok(())
             }
             ResponseResult::Err(e) => {
-                self.state.set(LauncherState::Error {
-                    message: e.message,
-                });
+                self.state.set(LauncherState::Error { message: e.message });
                 Ok(())
             }
         }
@@ -218,17 +222,23 @@ impl CommandClient {
 
     pub async fn launch(&self, entry_id: &EntryId) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
-        client.send(Command::Launch {
-            entry_id: entry_id.clone(),
-        }).await.map_err(Into::into)
+        client
+            .send(Command::Launch {
+                entry_id: entry_id.clone(),
+            })
+            .await
+            .map_err(Into::into)
     }
 
     #[allow(dead_code)]
     pub async fn stop_current(&self) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
-        client.send(Command::StopCurrent {
-            mode: shepherd_api::StopMode::Graceful,
-        }).await.map_err(Into::into)
+        client
+            .send(Command::StopCurrent {
+                mode: shepherd_api::StopMode::Graceful,
+            })
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn get_state(&self) -> Result<Response> {
@@ -239,7 +249,10 @@ impl CommandClient {
     #[allow(dead_code)]
     pub async fn list_entries(&self) -> Result<Response> {
         let mut client = IpcClient::connect(&self.socket_path).await?;
-        client.send(Command::ListEntries { at_time: None }).await.map_err(Into::into)
+        client
+            .send(Command::ListEntries { at_time: None })
+            .await
+            .map_err(Into::into)
     }
 }
 

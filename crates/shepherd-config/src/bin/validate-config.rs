@@ -29,7 +29,10 @@ fn main() -> ExitCode {
 
     // Check file exists
     if !config_path.exists() {
-        eprintln!("Error: Configuration file not found: {}", config_path.display());
+        eprintln!(
+            "Error: Configuration file not found: {}",
+            config_path.display()
+        );
         return ExitCode::from(1);
     }
 
@@ -39,7 +42,10 @@ fn main() -> ExitCode {
             println!("✓ Configuration is valid");
             println!();
             println!("Summary:");
-            println!("  Config version: {}", shepherd_config::CURRENT_CONFIG_VERSION);
+            println!(
+                "  Config version: {}",
+                shepherd_config::CURRENT_CONFIG_VERSION
+            );
             println!("  Entries: {}", policy.entries.len());
 
             // Show entry summary

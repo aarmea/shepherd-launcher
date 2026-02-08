@@ -42,10 +42,13 @@ impl RateLimiter {
     pub fn check(&mut self, client_id: &ClientId) -> bool {
         let now = Instant::now();
 
-        let bucket = self.clients.entry(client_id.clone()).or_insert(ClientBucket {
-            tokens: self.max_tokens,
-            last_refill: now,
-        });
+        let bucket = self
+            .clients
+            .entry(client_id.clone())
+            .or_insert(ClientBucket {
+                tokens: self.max_tokens,
+                last_refill: now,
+            });
 
         // Refill tokens if interval has passed
         let elapsed = now.duration_since(bucket.last_refill);
@@ -72,9 +75,8 @@ impl RateLimiter {
     /// Clean up stale client entries
     pub fn cleanup(&mut self, stale_after: Duration) {
         let now = Instant::now();
-        self.clients.retain(|_, bucket| {
-            now.duration_since(bucket.last_refill) < stale_after
-        });
+        self.clients
+            .retain(|_, bucket| now.duration_since(bucket.last_refill) < stale_after);
     }
 }
 

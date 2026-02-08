@@ -1,6 +1,6 @@
 //! Launcher application state management
 
-use shepherd_api::{ServiceStateSnapshot, EntryView, Event, EventPayload};
+use shepherd_api::{EntryView, Event, EventPayload, ServiceStateSnapshot};
 use shepherd_util::SessionId;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -18,7 +18,7 @@ pub enum LauncherState {
     /// Launch requested, waiting for response
     Launching {
         #[allow(dead_code)]
-        entry_id: String
+        entry_id: String,
     },
     /// Session is running
     SessionActive {
@@ -62,7 +62,10 @@ impl SharedState {
         tracing::info!(event = ?event.payload, "Received event from shepherdd");
         match event.payload {
             EventPayload::StateChanged(snapshot) => {
-                tracing::info!(has_session = snapshot.current_session.is_some(), "Applying state snapshot");
+                tracing::info!(
+                    has_session = snapshot.current_session.is_some(),
+                    "Applying state snapshot"
+                );
                 self.apply_snapshot(snapshot);
             }
             EventPayload::SessionStarted {
@@ -87,7 +90,12 @@ impl SharedState {
                     time_remaining,
                 });
             }
-            EventPayload::SessionEnded { session_id, entry_id, reason, .. } => {
+            EventPayload::SessionEnded {
+                session_id,
+                entry_id,
+                reason,
+                ..
+            } => {
                 tracing::info!(session_id = %session_id, entry_id = %entry_id, reason = ?reason, "Session ended event - setting Connecting");
                 // Will be followed by StateChanged, but set to connecting
                 // to ensure grid reloads

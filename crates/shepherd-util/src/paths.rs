@@ -40,7 +40,9 @@ pub fn default_socket_path() -> PathBuf {
 pub fn socket_path_without_env() -> PathBuf {
     // Try XDG_RUNTIME_DIR first (typically /run/user/<uid>)
     if let Ok(runtime_dir) = std::env::var("XDG_RUNTIME_DIR") {
-        return PathBuf::from(runtime_dir).join(APP_DIR).join(SOCKET_FILENAME);
+        return PathBuf::from(runtime_dir)
+            .join(APP_DIR)
+            .join(SOCKET_FILENAME);
     }
 
     // Fallback to /tmp with username
@@ -109,10 +111,13 @@ pub fn default_log_dir() -> PathBuf {
 /// Get the parent directory of the socket (for creating it)
 pub fn socket_dir() -> PathBuf {
     let socket_path = socket_path_without_env();
-    socket_path.parent().map(|p| p.to_path_buf()).unwrap_or_else(|| {
-        // Should never happen with our paths, but just in case
-        PathBuf::from("/tmp").join(APP_DIR)
-    })
+    socket_path
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| {
+            // Should never happen with our paths, but just in case
+            PathBuf::from("/tmp").join(APP_DIR)
+        })
 }
 
 /// Configuration subdirectory name (uses "shepherd" not "shepherdd")

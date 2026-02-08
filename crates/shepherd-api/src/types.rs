@@ -125,14 +125,9 @@ pub enum ReasonCode {
         next_window_start: Option<DateTime<Local>>,
     },
     /// Daily quota exhausted
-    QuotaExhausted {
-        used: Duration,
-        quota: Duration,
-    },
+    QuotaExhausted { used: Duration, quota: Duration },
     /// Cooldown period active
-    CooldownActive {
-        available_at: DateTime<Local>,
-    },
+    CooldownActive { available_at: DateTime<Local> },
     /// Another session is active
     SessionActive {
         entry_id: EntryId,
@@ -140,17 +135,11 @@ pub enum ReasonCode {
         remaining: Option<Duration>,
     },
     /// Host doesn't support this entry kind
-    UnsupportedKind {
-        kind: EntryKindTag,
-    },
+    UnsupportedKind { kind: EntryKindTag },
     /// Entry is explicitly disabled
-    Disabled {
-        reason: Option<String>,
-    },
+    Disabled { reason: Option<String> },
     /// Internet connectivity is required but unavailable
-    InternetUnavailable {
-        check: Option<String>,
-    },
+    InternetUnavailable { check: Option<String> },
 }
 
 /// Warning severity level

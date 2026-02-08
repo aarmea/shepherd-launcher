@@ -1,16 +1,19 @@
 //! Validated policy structures
 
-use crate::schema::{
-    RawConfig, RawEntry, RawEntryKind, RawInternetConfig, RawVolumeConfig, RawServiceConfig,
-    RawWarningThreshold,
-};
 use crate::internet::{
-    EntryInternetPolicy, InternetCheckTarget, InternetConfig, DEFAULT_INTERNET_CHECK_INTERVAL,
-    DEFAULT_INTERNET_CHECK_TIMEOUT,
+    DEFAULT_INTERNET_CHECK_INTERVAL, DEFAULT_INTERNET_CHECK_TIMEOUT, EntryInternetPolicy,
+    InternetCheckTarget, InternetConfig,
+};
+use crate::schema::{
+    RawConfig, RawEntry, RawEntryKind, RawInternetConfig, RawServiceConfig, RawVolumeConfig,
+    RawWarningThreshold,
 };
 use crate::validation::{parse_days, parse_time};
 use shepherd_api::{EntryKind, WarningSeverity, WarningThreshold};
-use shepherd_util::{DaysOfWeek, EntryId, TimeWindow, WallClock, default_data_dir, default_log_dir, socket_path_without_env};
+use shepherd_util::{
+    DaysOfWeek, EntryId, TimeWindow, WallClock, default_data_dir, default_log_dir,
+    socket_path_without_env,
+};
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -94,24 +97,17 @@ pub struct ServiceConfig {
 
 impl ServiceConfig {
     fn from_raw(raw: RawServiceConfig) -> Self {
-        let log_dir = raw
-            .log_dir
-            .clone()
-            .unwrap_or_else(default_log_dir);
+        let log_dir = raw.log_dir.clone().unwrap_or_else(default_log_dir);
         let child_log_dir = raw
             .child_log_dir
             .unwrap_or_else(|| log_dir.join("sessions"));
         let internet = convert_internet_config(raw.internet.as_ref());
         Self {
-            socket_path: raw
-                .socket_path
-                .unwrap_or_else(socket_path_without_env),
+            socket_path: raw.socket_path.unwrap_or_else(socket_path_without_env),
             log_dir,
             capture_child_output: raw.capture_child_output,
             child_log_dir,
-            data_dir: raw
-                .data_dir
-                .unwrap_or_else(default_data_dir),
+            data_dir: raw.data_dir.unwrap_or_else(default_data_dir),
             internet,
         }
     }
@@ -126,7 +122,11 @@ impl Default for ServiceConfig {
             log_dir,
             data_dir: default_data_dir(),
             capture_child_output: false,
-            internet: InternetConfig::new(None, DEFAULT_INTERNET_CHECK_INTERVAL, DEFAULT_INTERNET_CHECK_TIMEOUT),
+            internet: InternetConfig::new(
+                None,
+                DEFAULT_INTERNET_CHECK_INTERVAL,
+                DEFAULT_INTERNET_CHECK_TIMEOUT,
+            ),
         }
     }
 }
@@ -212,10 +212,7 @@ impl AvailabilityPolicy {
     }
 
     /// Get remaining time in current window
-    pub fn remaining_in_window(
-        &self,
-        dt: &chrono::DateTime<chrono::Local>,
-    ) -> Option<Duration> {
+    pub fn remaining_in_window(&self, dt: &chrono::DateTime<chrono::Local>) -> Option<Duration> {
         if self.always {
             return None; // No limit from windows
         }
@@ -269,8 +266,28 @@ impl VolumePolicy {
 
 fn convert_entry_kind(raw: RawEntryKind) -> EntryKind {
     match raw {
-        RawEntryKind::Process { command, args, env, cwd } => EntryKind::Process { command, args, env, cwd },
-        RawEntryKind::Snap { snap_name, command, args, env } => EntryKind::Snap { snap_name, command, args, env },
+        RawEntryKind::Process {
+            command,
+            args,
+            env,
+            cwd,
+        } => EntryKind::Process {
+            command,
+            args,
+            env,
+            cwd,
+        },
+        RawEntryKind::Snap {
+            snap_name,
+            command,
+            args,
+            env,
+        } => EntryKind::Snap {
+            snap_name,
+            command,
+            args,
+            env,
+        },
         RawEntryKind::Steam { app_id, args, env } => EntryKind::Steam { app_id, args, env },
         RawEntryKind::Flatpak { app_id, args, env } => EntryKind::Flatpak { app_id, args, env },
         RawEntryKind::Vm { driver, args } => EntryKind::Vm { driver, args },
@@ -347,7 +364,10 @@ fn seconds_to_duration_or_unlimited(secs: u64) -> Option<Duration> {
     }
 }
 
-fn convert_limits(raw: crate::schema::RawLimits, default_max_run: Option<Duration>) -> LimitsPolicy {
+fn convert_limits(
+    raw: crate::schema::RawLimits,
+    default_max_run: Option<Duration>,
+) -> LimitsPolicy {
     LimitsPolicy {
         max_run: raw
             .max_run_seconds

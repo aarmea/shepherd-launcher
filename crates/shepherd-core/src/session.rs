@@ -29,8 +29,7 @@ impl SessionPlan {
             .iter()
             .filter(|w| Duration::from_secs(w.seconds_before) < max_duration)
             .map(|w| {
-                let trigger_after =
-                    max_duration - Duration::from_secs(w.seconds_before);
+                let trigger_after = max_duration - Duration::from_secs(w.seconds_before);
                 (w.seconds_before, trigger_after)
             })
             .collect()
@@ -67,11 +66,7 @@ pub struct ActiveSession {
 
 impl ActiveSession {
     /// Create a new session from an approved plan
-    pub fn new(
-        plan: SessionPlan,
-        now: DateTime<Local>,
-        now_mono: MonotonicInstant,
-    ) -> Self {
+    pub fn new(plan: SessionPlan, now: DateTime<Local>, now_mono: MonotonicInstant) -> Self {
         let (deadline, deadline_mono) = match plan.max_duration {
             Some(max_dur) => {
                 let deadline = now + chrono::Duration::from_std(max_dur).unwrap();
@@ -101,7 +96,8 @@ impl ActiveSession {
 
     /// Get time remaining using monotonic time. None means unlimited.
     pub fn time_remaining(&self, now_mono: MonotonicInstant) -> Option<Duration> {
-        self.deadline_mono.map(|deadline| deadline.saturating_duration_until(now_mono))
+        self.deadline_mono
+            .map(|deadline| deadline.saturating_duration_until(now_mono))
     }
 
     /// Check if session is expired (never true for unlimited sessions)
@@ -220,7 +216,10 @@ mod tests {
 
         assert_eq!(session.state, SessionState::Launching);
         assert!(session.warnings_issued.is_empty());
-        assert_eq!(session.time_remaining(now_mono), Some(Duration::from_secs(300)));
+        assert_eq!(
+            session.time_remaining(now_mono),
+            Some(Duration::from_secs(300))
+        );
     }
 
     #[test]

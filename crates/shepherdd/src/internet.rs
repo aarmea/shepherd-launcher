@@ -26,9 +26,10 @@ impl InternetMonitor {
         for entry in &policy.entries {
             if entry.internet.required
                 && let Some(check) = entry.internet.check.clone()
-                && !targets.contains(&check) {
-                    targets.push(check);
-                }
+                && !targets.contains(&check)
+            {
+                targets.push(check);
+            }
         }
 
         if targets.is_empty() {

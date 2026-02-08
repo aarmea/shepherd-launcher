@@ -51,7 +51,8 @@ mod imp {
 
             // Configure flow box
             self.flow_box.set_homogeneous(true);
-            self.flow_box.set_selection_mode(gtk4::SelectionMode::Single);
+            self.flow_box
+                .set_selection_mode(gtk4::SelectionMode::Single);
             self.flow_box.set_max_children_per_line(6);
             self.flow_box.set_min_children_per_line(2);
             self.flow_box.set_row_spacing(24);
@@ -118,9 +119,10 @@ impl LauncherGrid {
             let on_launch = imp.on_launch.clone();
             tile.connect_clicked(move |tile| {
                 if let Some(entry_id) = tile.entry_id()
-                    && let Some(callback) = on_launch.borrow().as_ref() {
-                        callback(entry_id);
-                    }
+                    && let Some(callback) = on_launch.borrow().as_ref()
+                {
+                    callback(entry_id);
+                }
             });
 
             imp.flow_box.insert(&tile, -1);
@@ -244,7 +246,6 @@ impl LauncherGrid {
             }
         }
     }
-
 }
 
 impl Default for LauncherGrid {
