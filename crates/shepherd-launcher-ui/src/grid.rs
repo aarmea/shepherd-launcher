@@ -147,23 +147,74 @@ impl LauncherGrid {
 
     pub fn move_selection(&self, dx: i32, dy: i32) {
         let imp = self.imp();
-        let tile_count = imp.tiles.borrow().len() as i32;
-        if tile_count == 0 {
+        if imp.tiles.borrow().is_empty() {
             return;
         }
 
-        let current_index = imp
+        let current_child = imp
             .flow_box
             .selected_children()
             .first()
-            .map(|child| child.index())
-            .unwrap_or(0);
+            .cloned()
+            .or_else(|| imp.flow_box.child_at_index(0));
+        let Some(current_child) = current_child else {
+            return;
+        };
 
-        let columns = self.estimated_columns(tile_count);
-        let mut new_index = current_index + dx + (dy * columns);
-        new_index = new_index.clamp(0, tile_count - 1);
+        let current_alloc = current_child.allocation();
+        let current_x = current_alloc.x();
+        let current_y = current_alloc.y();
+        let mut best: Option<(gtk4::FlowBoxChild, i32, i32)> = None;
 
-        if let Some(child) = imp.flow_box.child_at_index(new_index) {
+        let tile_count = imp.tiles.borrow().len() as i32;
+        for idx in 0..tile_count {
+            let Some(candidate) = imp.flow_box.child_at_index(idx) else {
+                continue;
+            };
+            if candidate == current_child {
+                continue;
+            }
+
+            let alloc = candidate.allocation();
+            let x = alloc.x();
+            let y = alloc.y();
+
+            let is_direction_match = match (dx, dy) {
+                (-1, 0) => y == current_y && x < current_x,
+                (1, 0) => y == current_y && x > current_x,
+                (0, -1) => y < current_y,
+                (0, 1) => y > current_y,
+                _ => false,
+            };
+            if !is_direction_match {
+                continue;
+            }
+
+            let primary_dist = match (dx, dy) {
+                (-1, 0) | (1, 0) => (x - current_x).abs(),
+                (0, -1) | (0, 1) => (y - current_y).abs(),
+                _ => i32::MAX,
+            };
+            let secondary_dist = match (dx, dy) {
+                (-1, 0) | (1, 0) => (y - current_y).abs(),
+                (0, -1) | (0, 1) => (x - current_x).abs(),
+                _ => i32::MAX,
+            };
+
+            let replace = match best {
+                None => true,
+                Some((_, best_primary, best_secondary)) => {
+                    primary_dist < best_primary
+                        || (primary_dist == best_primary && secondary_dist < best_secondary)
+                }
+            };
+
+            if replace {
+                best = Some((candidate, primary_dist, secondary_dist));
+            }
+        }
+
+        if let Some((child, _, _)) = best {
             imp.flow_box.select_child(&child);
             child.grab_focus();
         }
@@ -194,24 +245,6 @@ impl LauncherGrid {
         }
     }
 
-    fn estimated_columns(&self, tile_count: i32) -> i32 {
-        let imp = self.imp();
-        let width = imp.flow_box.allocation().width();
-
-        let max_cols = imp.flow_box.max_children_per_line() as i32;
-        let min_cols = imp.flow_box.min_children_per_line() as i32;
-        let fallback = max_cols.clamp(min_cols, tile_count.max(1));
-
-        if width <= 0 {
-            return fallback.max(1);
-        }
-
-        // Tile width is 160 and column spacing is 24.
-        let estimated = width / (160 + 24);
-        estimated
-            .clamp(min_cols.max(1), max_cols.max(1))
-            .clamp(1, tile_count.max(1))
-    }
 }
 
 impl Default for LauncherGrid {
