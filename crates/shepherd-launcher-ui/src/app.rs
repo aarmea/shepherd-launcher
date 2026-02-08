@@ -163,8 +163,6 @@ impl LauncherApp {
         stack.add_named(&disconnected_view.0, Some("disconnected"));
 
         window.set_child(Some(&stack));
-        Self::setup_keyboard_input(&window, &grid);
-        Self::setup_gamepad_input(&window, &grid);
 
         // Create shared state
         let state = SharedState::new();
@@ -178,6 +176,14 @@ impl LauncherApp {
 
         // Create command client for sending commands
         let command_client = Arc::new(CommandClient::new(&socket_path));
+        Self::setup_keyboard_input(&window, &grid);
+        Self::setup_gamepad_input(
+            &window,
+            &grid,
+            command_client.clone(),
+            runtime.clone(),
+            state.clone(),
+        );
 
         // Connect grid launch callback
         let cmd_client = command_client.clone();
@@ -306,7 +312,8 @@ impl LauncherApp {
         let state_for_client = state.clone();
         let socket_for_client = socket_path.clone();
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime for event loop");
+            let rt = tokio::runtime::Runtime::new()
+                .expect("Failed to create tokio runtime for event loop");
             rt.block_on(async move {
                 let client = ServiceClient::new(socket_for_client, state_for_client, command_rx);
                 client.run().await;
@@ -432,29 +439,15 @@ impl LauncherApp {
             }
         });
         window.add_controller(key_controller);
-
-        let exit_controller = gtk4::EventControllerKey::new();
-        let window_weak = window.downgrade();
-        exit_controller.connect_key_pressed(move |_, key, _, modifiers| {
-            let alt_f4 = key == gtk4::gdk::Key::F4
-                && modifiers.intersects(gtk4::gdk::ModifierType::ALT_MASK);
-            let ctrl_w = (key == gtk4::gdk::Key::w || key == gtk4::gdk::Key::W)
-                && modifiers.intersects(gtk4::gdk::ModifierType::CONTROL_MASK);
-            let home = key == gtk4::gdk::Key::Home || key == gtk4::gdk::Key::HomePage;
-
-            if alt_f4 || ctrl_w || home {
-                if let Some(window) = window_weak.upgrade() {
-                    window.close();
-                }
-                glib::Propagation::Stop
-            } else {
-                glib::Propagation::Proceed
-            }
-        });
-        window.add_controller(exit_controller);
     }
 
-    fn setup_gamepad_input(window: &gtk4::ApplicationWindow, grid: &LauncherGrid) {
+    fn setup_gamepad_input(
+        _window: &gtk4::ApplicationWindow,
+        grid: &LauncherGrid,
+        command_client: Arc<CommandClient>,
+        runtime: Arc<Runtime>,
+        state: SharedState,
+    ) {
         let mut gilrs = match gilrs::Gilrs::new() {
             Ok(gilrs) => gilrs,
             Err(e) => {
@@ -464,7 +457,9 @@ impl LauncherApp {
         };
 
         let grid_weak = grid.downgrade();
-        let window_weak = window.downgrade();
+        let cmd_client = command_client.clone();
+        let rt = runtime.clone();
+        let state_clone = state.clone();
         let mut axis_state = GamepadAxisState::default();
 
         glib::timeout_add_local(Duration::from_millis(16), move || {
@@ -483,10 +478,11 @@ impl LauncherApp {
                             grid.launch_selected();
                         }
                         gilrs::Button::Mode => {
-                            if let Some(window) = window_weak.upgrade() {
-                                window.close();
-                                return glib::ControlFlow::Break;
-                            }
+                            Self::request_stop_current(
+                                cmd_client.clone(),
+                                rt.clone(),
+                                state_clone.clone(),
+                            );
                         }
                         _ => {}
                     },
@@ -498,6 +494,34 @@ impl LauncherApp {
             }
 
             glib::ControlFlow::Continue
+        });
+    }
+
+    fn request_stop_current(
+        command_client: Arc<CommandClient>,
+        runtime: Arc<Runtime>,
+        state: SharedState,
+    ) {
+        runtime.spawn(async move {
+            match command_client.stop_current().await {
+                Ok(response) => match response.result {
+                    shepherd_api::ResponseResult::Ok(shepherd_api::ResponsePayload::Stopped) => {
+                        info!("StopCurrent acknowledged");
+                    }
+                    shepherd_api::ResponseResult::Err(err) => {
+                        debug!(error = %err.message, "StopCurrent request denied");
+                    }
+                    _ => {
+                        debug!("Unexpected StopCurrent response payload");
+                    }
+                },
+                Err(e) => {
+                    error!(error = %e, "StopCurrent request failed");
+                    state.set(LauncherState::Error {
+                        message: format!("Failed to stop current activity: {}", e),
+                    });
+                }
+            }
         });
     }
 
