@@ -100,7 +100,7 @@ sway_start_nested() {
     trap sway_cleanup EXIT
     
     # Start sway with wayland backend (nested in current session)
-    WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c "$sway_config" &
+    WLR_BACKENDS=wayland WLR_LIBINPUT_NO_DEVICES=1 sway -c "$sway_config" --unsupported-gpu &
     SWAY_PID=$!
     
     info "Sway started with PID $SWAY_PID"

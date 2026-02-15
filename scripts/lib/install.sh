@@ -113,7 +113,7 @@ install_desktop_entry() {
 [Desktop Entry]
 Name=Shepherd Kiosk
 Comment=Shepherd game launcher kiosk mode
-Exec=sway -c $SWAY_CONFIG_DIR/$SHEPHERD_SWAY_CONFIG
+Exec=sway -c $SWAY_CONFIG_DIR/$SHEPHERD_SWAY_CONFIG --unsupported-gpu
 Type=Application
 DesktopNames=shepherd
 EOF
