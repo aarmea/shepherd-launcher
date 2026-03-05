@@ -84,9 +84,37 @@ If it can run on Linux in *any way, shape, or form*, it can be supervised by
 
 ## Non-goals
 
-* Modifying or patching third-party applications
-* Circumventing DRM or platform protections
-* Replacing parental involvement with automation
+1. Modifying or patching third-party applications
+2. Circumventing DRM or platform protections
+3. Replacing parental involvement with automation or third-party content moderation
+4. Remotely monitoring users with telemetry
+5. Collecting, storing, or reporting personally identifying information (PII)
+
+### Regarding age verification
+
+`shepherd-launcher` may be considered "operating system software" under the
+[Digital Age Assurance Act][age-california] and similar legislation,
+and therefore subject to an age verification requirement.
+
+[age-california]: https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=202520260AB1043
+
+As legislated, such requirements are fundamentally incompatible with non-goals 3, 4, and 5.
+
+`shepherd-launcher` will *never* collect telemetry or PII, and as such, it will never implement this type of age verification.
+
+As a result, `shepherd-launcher` is not licensed for use in any region that requires OS-level age verification by law.
+**If you reside in any such region, you may not download, install, or redistribute `shepherd-launcher`.**
+
+This includes, but is not limited to:
+
+* California
+* Louisiana
+* Texas
+* Utah
+
+[Many other states are considering similar legislation.](https://actonline.org/2025/01/14/the-abcs-of-age-verification-in-the-united-states/)
+
+If you disagree with this assessment and you reside in an affected region, **please contact your representatives.**
 
 ## Installation
 
