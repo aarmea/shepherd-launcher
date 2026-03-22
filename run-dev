@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# Development run script - thin wrapper for shepherd dev run
-# This script is kept for backwards compatibility with existing workflows (i.e. lazy devs)
-
-exec ./scripts/shepherd dev run "$@"
